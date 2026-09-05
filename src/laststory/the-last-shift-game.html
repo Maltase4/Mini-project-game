@@ -1,0 +1,1058 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Last Shift</title>
+<style>
+/* ===== Design tokens =====
+   Color: near-night hospital corridor + literal ER triage colors
+     --bg        #0d1218  background, corridor-at-night
+     --panel     #161d24  case-file / chrome panels
+     --panel-alt #1c252d  interactive rows
+     --border    #2b343c  hairlines
+     --text      #e7ecf1  primary text
+     --muted     #8b98a5  secondary text
+     --accent    #33d1ba  ECG teal — the one recurring signature mark
+     --warn      #e2a144  triage: serious
+     --crit      #e2574c  triage: critical
+     --ok        #4fae7c  triage: minor/moderate/stable
+   Type: Source Serif 4 for narrative (case-file prose), IBM Plex Mono
+     for UI chrome / data (vitals, buttons, tags) — the contrast mirrors
+     a real chart: typed narrative notes vs. printed monitor readouts.
+*/
+
+@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --bg: #0d1218;
+  --panel: #161d24;
+  --panel-alt: #1c252d;
+  --border: #2b343c;
+  --text: #e7ecf1;
+  --muted: #8b98a5;
+  --accent: #33d1ba;
+  --warn: #e2a144;
+  --crit: #e2574c;
+  --ok: #4fae7c;
+}
+
+* { box-sizing: border-box; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family: 'Source Serif 4', Georgia, serif;
+  line-height: 1.6;
+  background-image:
+    repeating-linear-gradient(rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 3px),
+    radial-gradient(ellipse at 50% -10%, rgba(51,209,186,0.06), transparent 60%);
+  min-height: 100vh;
+  padding: 32px 20px 64px;
+}
+
+#app {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+button {
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+button:disabled { cursor: not-allowed; opacity: 0.45; }
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ===== ECG motif — the one signature recurring element ===== */
+
+.ecg-svg {
+  width: 100%;
+  height: 32px;
+  display: block;
+}
+.ecg-svg polyline {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  stroke-dasharray: 480;
+  stroke-dashoffset: 480;
+  animation: draw-ecg 1.4s ease-out forwards;
+}
+@keyframes draw-ecg {
+  to { stroke-dashoffset: 0; }
+}
+
+/* ===== Title screen ===== */
+
+.title-screen {
+  text-align: center;
+  padding-top: 8vh;
+}
+.title-screen .ecg { max-width: 260px; margin: 0 auto 28px; opacity: 0.85; }
+.title-screen h1 {
+  font-size: 2.6rem;
+  font-weight: 600;
+  margin: 0 0 14px;
+  letter-spacing: -0.01em;
+}
+.tagline {
+  color: var(--muted);
+  font-style: italic;
+  max-width: 46ch;
+  margin: 0 auto 40px;
+  font-size: 1.05rem;
+}
+.difficulty-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+.diff-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: 4px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: border-left-color 0.15s ease, background 0.15s ease;
+}
+.diff-card:hover, .diff-card:focus-visible {
+  border-left-color: var(--accent);
+  background: var(--panel-alt);
+}
+.diff-name {
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.diff-sub {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* ===== Chrome (top bar + vitals) ===== */
+
+.chrome {
+  border: 1px solid var(--border);
+  border-radius: 4px 4px 0 0;
+  border-bottom: none;
+  background: var(--panel);
+  overflow: hidden;
+}
+.chrome-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 12px 16px 10px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+.brand { color: var(--text); }
+.vitals {
+  display: flex;
+}
+.vital {
+  flex: 1;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-left: 1px solid var(--border);
+}
+.vital:first-child { border-left: none; }
+.vital-value {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+.vital-label {
+  font-size: 0.68rem;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* ===== Day banner ===== */
+
+.day-banner {
+  border: 1px solid var(--border);
+  border-top: none;
+  background: var(--panel);
+  padding: 18px 16px 6px;
+}
+.day-ecg { max-width: 200px; margin-bottom: 10px; opacity: 0.7; }
+.day-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+/* ===== Main panel ===== */
+
+.panel {
+  border: 1px solid var(--border);
+  border-top: none;
+  background: var(--panel);
+  border-radius: 0 0 4px 4px;
+  padding: 22px 20px 20px;
+}
+
+.case-file { max-width: 68ch; }
+.case-text {
+  margin: 0 0 16px;
+  white-space: pre-line;
+}
+.case-text-follow {
+  color: var(--muted);
+  border-left: 2px solid var(--border);
+  padding-left: 14px;
+}
+
+.btn-continue {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.85rem;
+  font-weight: 500;
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 3px;
+  padding: 10px 18px;
+  margin-top: 6px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.btn-continue:hover {
+  background: var(--accent);
+  color: #0d1218;
+}
+
+/* ===== Choices ===== */
+
+.choice-block { max-width: 68ch; }
+.choice-prompt {
+  margin: 0 0 14px;
+  font-size: 1.05rem;
+}
+.choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.choice-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  text-align: left;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-left: 3px solid transparent;
+  border-radius: 3px;
+  padding: 13px 16px;
+  font-size: 1rem;
+  transition: border-left-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+}
+.choice-row:hover, .choice-row:focus-visible {
+  border-left-color: var(--accent);
+  background: #212b34;
+  transform: translateX(2px);
+}
+.choice-index {
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--muted);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+/* ===== Hospital shift / triage ===== */
+
+.shift-head {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.assign-count { color: var(--text); }
+
+.patient-list, .result-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.patient-row {
+  display: grid;
+  grid-template-columns: 1.1fr 1.3fr auto auto;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: 3px;
+  padding: 11px 14px;
+  text-align: left;
+  font-size: 0.92rem;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.patient-row:not(:disabled):hover { background: #212b34; }
+.patient-row.assigned {
+  border-left-color: var(--accent);
+  background: #16302c;
+}
+.patient-name { font-weight: 600; }
+.patient-condition { color: var(--muted); }
+.patient-severity {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.patient-severity::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 1px;
+  display: inline-block;
+  background: var(--muted);
+}
+.tone-ok .patient-severity::before { background: var(--ok); }
+.tone-warn .patient-severity::before { background: var(--warn); }
+.tone-crit .patient-severity::before { background: var(--crit); }
+.tone-ok .patient-severity { color: var(--ok); }
+.tone-warn .patient-severity { color: var(--warn); }
+.tone-crit .patient-severity { color: var(--crit); }
+
+.patient-action {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--muted);
+  justify-self: end;
+}
+.patient-row.assigned .patient-action { color: var(--accent); }
+
+.result-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: 3px;
+  padding: 11px 14px;
+  font-size: 0.92rem;
+}
+.result-row.tone-ok { border-left-color: var(--ok); }
+.result-row.tone-warn { border-left-color: var(--warn); }
+.result-row.tone-crit { border-left-color: var(--crit); }
+
+/* ===== Day end ===== */
+
+.day-end { text-align: left; }
+.day-end-title { font-size: 1.1rem; font-weight: 600; margin: 0 0 6px; }
+.day-end-sub { color: var(--muted); margin: 0 0 16px; font-family: 'IBM Plex Mono', monospace; font-size: 0.85rem; }
+
+/* ===== Ending ===== */
+
+.ending-screen {
+  text-align: center;
+  padding-top: 6vh;
+}
+.ending-screen .ecg { max-width: 260px; margin: 0 auto 20px; }
+.ending-eyebrow {
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin: 0 0 6px;
+}
+.ending-screen h1 {
+  font-size: 2.2rem;
+  margin: 0 0 22px;
+}
+.ending-text {
+  text-align: left;
+  max-width: 60ch;
+  margin: 0 auto 14px;
+  color: var(--text);
+}
+.final-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  max-width: 60ch;
+  margin: 22px auto 28px;
+  text-align: left;
+}
+.final-stat {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  padding: 6px 2px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.85rem;
+}
+.final-stat span { color: var(--muted); }
+
+/* ===== Responsive ===== */
+
+@media (max-width: 480px) {
+  body { padding: 20px 12px 48px; }
+  .title-screen h1 { font-size: 2rem; }
+  .patient-row { grid-template-columns: 1fr; gap: 4px; }
+  .patient-action { justify-self: start; }
+  .vitals { flex-wrap: wrap; }
+  .vital { min-width: 33%; border-left: none; border-top: 1px solid var(--border); }
+  .final-stats { grid-template-columns: 1fr; }
+}
+
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ===================== DATA: SEVERITY / DIFFICULTY =====================
+
+const SEVERITY = {
+  MINOR:    { label: "Minor",    survive: 0.98, tone: "ok"   },
+  MODERATE: { label: "Moderate", survive: 0.85, tone: "ok"   },
+  SERIOUS:  { label: "Serious",  survive: 0.45, tone: "warn" },
+  CRITICAL: { label: "Critical", survive: 0.15, tone: "crit" },
+};
+
+const DIFFICULTY = {
+  EASY:   { label: "Easy",   sub: "More funding, more doctors, gentler cases.", money: 25000, doctors: 5 },
+  NORMAL: { label: "Normal", sub: "A fair fight. Balanced funding and staff.",  money: 15000, doctors: 4 },
+  HARD:   { label: "Hard",   sub: "Tight budget, short-staffed, brutal cases.", money: 10000, doctors: 3 },
+};
+
+// ===================== STATE =====================
+
+function newState(difficultyKey) {
+  const d = DIFFICULTY[difficultyKey];
+  return {
+    difficultyKey,
+    money: d.money,
+    doctors: d.doctors,
+    beds: d.doctors + 2,
+    reputation: 50,
+    investigation: 0,
+    mayaTrust: 50,
+    carterTrust: 50,
+    blackwood: 20,
+    flags: {},
+    patientsSaved: 0,
+    patientsLost: 0,
+    patientsTotal: 0,
+    evidenceCollected: false,
+    day: 1,
+  };
+}
+
+function clamp(v) { return Math.max(0, Math.min(100, v)); }
+function addMoney(s, n) { s.money = Math.max(0, s.money + n); }
+function addRep(s, n) { s.reputation = clamp(s.reputation + n); }
+function addInv(s, n) { s.investigation = clamp(s.investigation + n); }
+function addMaya(s, n) { s.mayaTrust = clamp(s.mayaTrust + n); }
+function addCarter(s, n) { s.carterTrust = clamp(s.carterTrust + n); }
+function addBlackwood(s, n) { s.blackwood = clamp(s.blackwood + n); }
+function setFlag(s, k) { s.flags[k] = true; }
+function hasFlag(s, k) { return !!s.flags[k]; }
+function saveRate(s) { return s.patientsTotal === 0 ? 1 : s.patientsSaved / s.patientsTotal; }
+
+// ===================== ENDINGS =====================
+
+const ENDINGS = {
+  HERO: {
+    title: "The Hero",
+    text: `You expose Project Orpheus AND keep St. Mary's alive. The government takes over the research program; the treatment is eventually redesigned and becomes legitimate.
+
+Maya walks into your office.
+MAYA: "Ready for another impossible week?"
+ALEX: "Absolutely not."
+Maya laughs. The phone rings.
+ALEX: "...I'll get it."`,
+  },
+  TRUTH: {
+    title: "The Truth",
+    text: `Alex exposes Project Orpheus. The hospital is investigated and Blackwood is arrested. St. Mary's closes for a time, then reopens under new management. Maya and Carter return.
+
+You couldn't save everyone. But you stopped the people who were willing to sacrifice others for money. Some battles aren't won by saving a life — they're won by refusing to let others be sacrificed.`,
+  },
+  DEAL: {
+    title: "The Deal",
+    text: `Alex accepts the promotion and becomes head of emergency medicine. Salary up. Hospital profitable. Project Orpheus continues.
+
+BLACKWOOD: "Congratulations, Doctor."
+Alex looks through the glass at the emergency room. A new patient is wheeled in. A familiar blood-test result appears on the screen. Alex knows exactly what it means.`,
+  },
+  SILENCE: {
+    title: "The Silence",
+    text: `You destroy the evidence. The hospital survives. Your colleagues survive. But you know what happened.
+
+Maya eventually leaves. Carter retires. Years later, a new doctor asks: "Was this always how things were?" Alex looks at them. "No." "What happened?" Alex doesn't answer.`,
+  },
+  COLLAPSE: {
+    title: "Hospital Collapse",
+    text: `Too many patients were lost. Reputation and funding ran out. The government shuts down the emergency department.
+
+The investigation was never completed. Whatever was happening at St. Mary's remained buried. For now.`,
+  },
+};
+
+function resolveEnding(s, finalChoice) {
+  const collapsed = s.reputation < 20 || s.money <= 0 || saveRate(s) < 0.4;
+  if (collapsed) return ENDINGS.COLLAPSE;
+  if (finalChoice === 4) return ENDINGS.DEAL;
+  if (finalChoice === 3) return ENDINGS.SILENCE;
+  const hero =
+    s.investigation >= 80 &&
+    s.evidenceCollected &&
+    s.mayaTrust >= 70 &&
+    s.carterTrust >= 70 &&
+    saveRate(s) >= 0.9 &&
+    s.reputation >= 80;
+  return hero ? ENDINGS.HERO : ENDINGS.TRUTH;
+}
+
+// ===================== SCRIPT (the "story map") =====================
+// Step types: text, day, shift, choice, finalChoice, dayEnd
+
+function buildScript() {
+  return [
+    { type: "text", body:
+`It's raining. St. Mary's Hospital looks old — half the lights in the entrance are broken. A handwritten sign reads: "EMERGENCY DEPARTMENT — PLEASE BE PATIENT."
+
+Dr. Daniel Carter, the senior physician, barely looks up.
+CARTER: "You're Morgan? Good. You're on emergency."
+ALEX: "I thought there were two senior doctors."
+CARTER: "There were." (he walks off)
+ALEX: "What happened to the other one?"
+CARTER: "He quit."
+
+Later, Maya — a nurse who's worked here six years — pulls you aside, nervous.
+MAYA: "Three patients came in last night. Different ages, different conditions. They all had the same blood abnormality."
+ALEX: "That's unusual."
+MAYA: "Very. And nobody wants to talk about it."` },
+
+    { type: "day", day: 1, title: "Something Is Wrong" },
+    { type: "shift", patients: [
+        { name: "Patient 101", condition: "Broken arm", severity: "MINOR" },
+        { name: "Patient 102", condition: "Fever", severity: "MODERATE" },
+        { name: "Patient 103", condition: "Chest pain", severity: "SERIOUS" },
+        { name: "Patient 104", condition: "Severe bleeding", severity: "CRITICAL" },
+    ]},
+    { type: "text", body:
+`Patient 103's chart says they were admitted to St. Mary's three months ago and "discharged successfully." But the patient insists they've never set foot here before.` },
+    { type: "choice", prompt: "What do you do?", options: [
+        { label: "Tell Maya about the discrepancy", effect: s => { setFlag(s,"toldMaya"); addMaya(s,10); addInv(s,10); } },
+        { label: "Report it to Dr. Carter", effect: s => { setFlag(s,"toldCarter"); addCarter(s,8); addInv(s,5); } },
+        { label: "Ignore it", effect: s => { setFlag(s,"ignoredDay1"); addInv(s,-5); } },
+    ]},
+    { type: "dayEnd" },
+
+    { type: "day", day: 2, title: "The Missing Records" },
+    { type: "shift", patients: [
+        { name: "Patient 205", condition: "Fracture", severity: "MODERATE" },
+        { name: "Patient 206", condition: "Appendicitis", severity: "SERIOUS" },
+        { name: "Patient 207", condition: "Allergic reaction", severity: "MODERATE" },
+    ]},
+    { type: "text", body:
+`Patient 103's file is gone — paper AND digital.
+MAYA: "Someone deleted it."
+ALEX: "Who has access?"
+MAYA: "Doctors. Administration. IT."
+ALEX: "Anyone else?"
+MAYA: (hesitates) "The research department."
+
+You learn St. Mary's has a private research wing, supposedly developing a treatment for a rare disease. It doesn't accept visitors.` },
+    { type: "choice", prompt: "How do you respond?", options: [
+        { label: "Push Maya for more details about the research wing", effect: s => { setFlag(s,"pushedMaya"); addMaya(s,5); addInv(s,10); } },
+        { label: "Quietly note it and move on for now", effect: s => { addInv(s,3); } },
+    ]},
+    { type: "dayEnd" },
+
+    { type: "day", day: 3, title: "The Research Wing" },
+    { type: "shift", patients: [
+        { name: "Patient 308", condition: "Chest trauma", severity: "CRITICAL" },
+        { name: "Patient 309", condition: "Migraine", severity: "MINOR" },
+        { name: "Patient 310", condition: "Laceration", severity: "MODERATE" },
+    ]},
+    { type: "text", body:
+`While hunting for medication overnight, you find an old access card belonging to Dr. Ethan Vale — the doctor who supposedly quit. The card still works.` },
+    { type: "choice", prompt: "What do you do with the card?", options: [
+        { label: "Enter the research wing", effect: s => {
+            setFlag(s,"enteredResearchWing"); addInv(s,20); setFlag(s,"foundOrpheus");
+          }, followUp:
+`Dozens of patient files line the shelves — every one shows the same strange blood abnormality. Worse: they aren't listed as patients. They're listed as TRIAL SUBJECTS.
+
+You find a folder labeled PROJECT ORPHEUS. Footsteps approach. You slip out just in time.` },
+        { label: "Give the card to hospital administration", effect: s => { setFlag(s,"reportedCard"); addCarter(s,5); addInv(s,-5); },
+          followUp: `Administration thanks you and quietly pockets the card. Nothing more is said.` },
+        { label: "Keep the card and investigate later", effect: s => { setFlag(s,"keptCard"); addInv(s,5); },
+          followUp: `You slide the card into your coat pocket. It can wait — for now.` },
+    ]},
+    { type: "dayEnd" },
+
+    { type: "day", day: 4, title: "Maya's Secret" },
+    { type: "shift", patients: [
+        { name: "Patient 411", condition: "Fracture", severity: "MODERATE" },
+        { name: "Patient 412", condition: "Cardiac event", severity: "CRITICAL" },
+        { name: "Patient 413", condition: "Fever", severity: "MINOR" },
+    ]},
+    { type: "text", body:
+`You confront Maya. She finally admits she's known about Project Orpheus for two years — an experimental neurological treatment with dangerous side effects the hospital has been hiding because the research is worth millions. Dr. Vale tried to expose them. That's why he "quit."` },
+    { type: "choice", prompt: "How do you respond to Maya?", options: [
+        { label: "Reassure her — you're in this together", effect: s => { addMaya(s,15); setFlag(s,"helpedMaya"); } },
+        { label: "Press her harder on what else she's hiding", effect: s => { addMaya(s,-5); addInv(s,8); } },
+    ], after: s => { s.evidenceCollected = hasFlag(s,"foundOrpheus") && s.investigation >= 30; } },
+    { type: "dayEnd" },
+
+    { type: "day", day: 5, title: "Blackwood's Deal" },
+    { type: "shift", patients: [
+        { name: "Patient 520", condition: "Broken leg", severity: "MODERATE" },
+        { name: "Patient 521", condition: "Internal bleeding", severity: "CRITICAL" },
+    ]},
+    { type: "text", body:
+`Director Richard Blackwood summons you.
+BLACKWOOD: "You're asking a lot of questions, Doctor."
+ALEX: "I'm treating patients."
+BLACKWOOD: "No. You're investigating." He offers a deal: stop asking questions, and you'll get your own department.
+ALEX: "What about the patients?"
+BLACKWOOD: "Patients come and go. Money keeps hospitals alive."` },
+    { type: "choice", prompt: "Your move:", options: [
+        { label: "Accept the deal", effect: s => { setFlag(s,"acceptedDeal"); addBlackwood(s,30); addInv(s,-15); addMoney(s,3000); } },
+        { label: "Refuse outright", effect: s => { setFlag(s,"refusedDeal"); addBlackwood(s,-20); addRep(s,5); addInv(s,5); } },
+        { label: "Pretend to accept, secretly keep gathering evidence", effect: s => { setFlag(s,"pretendedToAccept"); addBlackwood(s,10); addInv(s,10); } },
+    ]},
+    { type: "dayEnd" },
+
+    { type: "day", day: 6, title: "Mass Casualty" },
+    { type: "text", body: "A bus has crashed near the hospital. Fifteen patients are incoming — four critical, six serious, five moderate. Your doctors and beds are stretched to the limit." },
+    { type: "shift", patients: [
+        { name: "Crash Victim A", condition: "Trauma", severity: "CRITICAL" },
+        { name: "Crash Victim B", condition: "Trauma", severity: "CRITICAL" },
+        { name: "Crash Victim C", condition: "Trauma", severity: "CRITICAL" },
+        { name: "Crash Victim D", condition: "Trauma", severity: "CRITICAL" },
+        { name: "Crash Victim E", condition: "Trauma", severity: "SERIOUS" },
+        { name: "Crash Victim F", condition: "Trauma", severity: "SERIOUS" },
+        { name: "Crash Victim G", condition: "Trauma", severity: "SERIOUS" },
+        { name: "Crash Victim H", condition: "Trauma", severity: "SERIOUS" },
+        { name: "Crash Victim I", condition: "Trauma", severity: "SERIOUS" },
+        { name: "Crash Victim J", condition: "Trauma", severity: "SERIOUS" },
+        { name: "Crash Victim K", condition: "Trauma", severity: "MODERATE" },
+        { name: "Crash Victim L", condition: "Trauma", severity: "MODERATE" },
+        { name: "Crash Victim M", condition: "Trauma", severity: "MODERATE" },
+        { name: "Crash Victim N", condition: "Trauma", severity: "MODERATE" },
+        { name: "Crash Victim O", condition: "Trauma", severity: "MODERATE" },
+    ]},
+    { type: "text", body:
+`Amid the chaos, Maya recognizes one of the crash victims: Dr. Vale. He's alive — barely. Before surgery, he grabs your wrist.
+VALE: "Room 417. Everything... is in Room 417."
+He loses consciousness.` },
+    { type: "dayEnd" },
+
+    { type: "day", day: 7, title: "Room 417" },
+    { type: "text", body:
+`Inside Room 417 is a server holding years of research data. Project Orpheus wasn't originally meant to harm anyone — the treatment genuinely worked. But when the hospital discovered a side effect could be extremely profitable, they kept the trial running instead of stopping it. Hundreds of patients were affected. You now have the evidence.`,
+      after: s => { if (hasFlag(s,"enteredResearchWing")) s.evidenceCollected = true; } },
+    { type: "text", body:
+`Blackwood catches you at the server.
+BLACKWOOD: "You have no idea what you're doing."
+ALEX: "I know exactly what I'm doing."
+BLACKWOOD: "If this gets out, St. Mary's closes."
+ALEX: "Then maybe it should."
+BLACKWOOD: "Think carefully." (sets a USB drive on the table) "Give me the evidence, and I'll make sure everyone walks away."` },
+    { type: "finalChoice", prompt: "Final decision — what do you do with the evidence?", options: [
+        "Release the evidence publicly",
+        "Give the evidence to the authorities",
+        "Destroy the evidence and protect the hospital",
+        "Give the evidence to Blackwood",
+    ]},
+  ];
+}
+
+// quick sanity check when run under node
+if (typeof module !== "undefined") {
+  const s = newState("NORMAL");
+  const script = buildScript();
+  console.log("Steps:", script.length);
+  console.log("Initial state OK:", JSON.stringify(s).length > 0);
+  const ending = resolveEnding(s, 2);
+  console.log("Sample ending resolves to:", ending.title);
+}
+
+</script>
+<script>
+// ===================== ENGINE =====================
+// Depends on: SEVERITY, DIFFICULTY, newState, clamp/add* helpers,
+// ENDINGS, resolveEnding, buildScript  (all defined in game-data.js)
+
+const App = (() => {
+  let state = null;
+  let script = null;
+  let stepIndex = -1;      // -1 = title screen
+  let shiftAssigned = [];  // indices of patients currently assigned a doctor, during a shift step
+  let shiftResults = null; // computed outcomes once "Begin shift" is pressed
+  let pendingFollowUp = null; // extra text to show after a choice with a followUp
+
+  const root = () => document.getElementById("app");
+
+  function start() {
+    render();
+  }
+
+  function chooseDifficulty(key) {
+    state = newState(key);
+    script = buildScript();
+    stepIndex = 0;
+    render();
+  }
+
+  function advance() {
+    stepIndex++;
+    shiftAssigned = [];
+    shiftResults = null;
+    if (stepIndex >= script.length) {
+      render();
+      return;
+    }
+    render();
+  }
+
+  function currentStep() {
+    return script[stepIndex];
+  }
+
+  function toggleAssign(i, capacity) {
+    const idx = shiftAssigned.indexOf(i);
+    if (idx >= 0) {
+      shiftAssigned.splice(idx, 1);
+    } else if (shiftAssigned.length < capacity) {
+      shiftAssigned.push(i);
+    }
+    render();
+  }
+
+  function beginShift() {
+    const step = currentStep();
+    const results = [];
+    step.patients.forEach((p, i) => {
+      const sev = SEVERITY[p.severity];
+      if (shiftAssigned.includes(i)) {
+        results.push({ ...p, outcome: "treated" });
+        state.patientsSaved++; state.patientsTotal++;
+      } else {
+        const lives = Math.random() < sev.survive;
+        if (lives) {
+          results.push({ ...p, outcome: "stabilized" });
+          state.patientsSaved++; state.patientsTotal++;
+        } else {
+          results.push({ ...p, outcome: "lost" });
+          state.patientsLost++; state.patientsTotal++;
+          addRep(state, -6);
+        }
+      }
+    });
+    const income = shiftAssigned.length * 300;
+    addMoney(state, income);
+    if (shiftAssigned.length === step.patients.length) addRep(state, 2);
+    shiftResults = { results, income };
+    render();
+  }
+
+  function makeChoice(step, opt) {
+    opt.effect(state);
+    if (step.after) step.after(state);
+    pendingFollowUp = opt.followUp || null;
+    advance();
+  }
+
+  function makeFinalChoice(idx1based) {
+    state.finalChoice = idx1based;
+    advance();
+  }
+
+  // ---------------- rendering ----------------
+
+  function render() {
+    const el = root();
+    el.innerHTML = "";
+
+    if (stepIndex === -1) {
+      el.appendChild(renderTitle());
+      return;
+    }
+
+    if (stepIndex >= script.length) {
+      const ending = resolveEnding(state, state.finalChoice);
+      el.appendChild(renderEnding(ending));
+      return;
+    }
+
+    const step = currentStep();
+    el.appendChild(renderChrome(step));
+
+    const body = document.createElement("div");
+    body.className = "panel";
+
+    switch (step.type) {
+      case "text": body.appendChild(renderText(step)); break;
+      case "day": body.appendChild(renderDay(step)); stepIndex++; /* auto-advance through header */ break;
+      case "shift": body.appendChild(renderShift(step)); break;
+      case "choice": body.appendChild(renderChoice(step)); break;
+      case "finalChoice": body.appendChild(renderFinalChoice(step)); break;
+      case "dayEnd": body.appendChild(renderDayEnd()); break;
+    }
+
+    el.appendChild(body);
+
+    // if we auto-advanced past a "day" header, re-render immediately with the next real step
+    if (step.type === "day") { render(); }
+  }
+
+  function renderTitle() {
+    const wrap = document.createElement("div");
+    wrap.className = "title-screen";
+    wrap.innerHTML = `
+      <div class="ecg">${ecgSvg()}</div>
+      <h1>The Last Shift</h1>
+      <p class="tagline">Seven days. One emergency department. A truth someone buried on purpose.</p>
+      <div class="difficulty-list"></div>
+    `;
+    const list = wrap.querySelector(".difficulty-list");
+    Object.entries(DIFFICULTY).forEach(([key, d]) => {
+      const btn = document.createElement("button");
+      btn.className = "diff-card";
+      btn.innerHTML = `<span class="diff-name">${d.label}</span><span class="diff-sub">${d.sub}</span>`;
+      btn.onclick = () => chooseDifficulty(key);
+      list.appendChild(btn);
+    });
+    return wrap;
+  }
+
+  function renderChrome(step) {
+    const chrome = document.createElement("div");
+    chrome.className = "chrome";
+    const dayLabel = state.day <= 7 ? `Day ${state.day} / 7` : "";
+    chrome.innerHTML = `
+      <div class="chrome-top">
+        <span class="brand">St. Mary's — case file</span>
+        <span class="day-label">${dayLabel}</span>
+      </div>
+      <div class="vitals"></div>
+    `;
+    const vitals = chrome.querySelector(".vitals");
+    const items = [
+      ["reputation", state.reputation],
+      ["investigation", state.investigation],
+      ["cash", "$" + state.money.toLocaleString()],
+      ["maya trust", state.mayaTrust],
+      ["carter trust", state.carterTrust],
+    ];
+    items.forEach(([label, value]) => {
+      const d = document.createElement("div");
+      d.className = "vital";
+      d.innerHTML = `<span class="vital-value">${value}</span><span class="vital-label">${label}</span>`;
+      vitals.appendChild(d);
+    });
+    return chrome;
+  }
+
+  function renderDay(step) {
+    const d = document.createElement("div");
+    d.className = "day-banner";
+    d.innerHTML = `<div class="day-ecg">${ecgSvg()}</div><div class="day-title">Day ${step.day} — ${step.title}</div>`;
+    return d;
+  }
+
+  function renderText(step) {
+    const wrap = document.createElement("div");
+    wrap.className = "case-file";
+    const p = document.createElement("p");
+    p.className = "case-text";
+    p.textContent = step.body;
+    wrap.appendChild(p);
+    if (pendingFollowUp) {
+      const fp = document.createElement("p");
+      fp.className = "case-text case-text-follow";
+      fp.textContent = pendingFollowUp;
+      wrap.appendChild(fp);
+      pendingFollowUp = null;
+    }
+    const btn = document.createElement("button");
+    btn.className = "btn-continue";
+    btn.textContent = "Continue";
+    btn.onclick = () => { if (step.after) step.after(state); advance(); };
+    wrap.appendChild(btn);
+    return wrap;
+  }
+
+  function renderShift(step) {
+    const wrap = document.createElement("div");
+    wrap.className = "shift";
+    const capacity = Math.min(state.doctors, state.beds);
+
+    if (!shiftResults) {
+      wrap.innerHTML = `
+        <div class="shift-head">
+          <span>Hospital shift — doctors: ${state.doctors} · beds: ${state.beds}</span>
+          <span class="assign-count">${shiftAssigned.length} / ${capacity} assigned</span>
+        </div>
+        <div class="patient-list"></div>
+        <button class="btn-continue">Begin shift</button>
+      `;
+      const list = wrap.querySelector(".patient-list");
+      step.patients.forEach((p, i) => {
+        const sev = SEVERITY[p.severity];
+        const row = document.createElement("button");
+        const assigned = shiftAssigned.includes(i);
+        row.className = `patient-row tone-${sev.tone}` + (assigned ? " assigned" : "");
+        row.disabled = !assigned && shiftAssigned.length >= capacity;
+        row.innerHTML = `
+          <span class="patient-name">${p.name}</span>
+          <span class="patient-condition">${p.condition}</span>
+          <span class="patient-severity">${sev.label}</span>
+          <span class="patient-action">${assigned ? "Assigned ✓" : "Assign doctor"}</span>
+        `;
+        row.onclick = () => toggleAssign(i, capacity);
+        list.appendChild(row);
+      });
+      wrap.querySelector(".btn-continue").onclick = beginShift;
+    } else {
+      wrap.innerHTML = `<div class="shift-head"><span>Shift results</span><span class="assign-count">Income +$${shiftResults.income}</span></div>`;
+      const list = document.createElement("div");
+      list.className = "result-list";
+      shiftResults.results.forEach(r => {
+        const row = document.createElement("div");
+        const toneClass = r.outcome === "lost" ? "tone-crit" : r.outcome === "stabilized" ? "tone-warn" : "tone-ok";
+        row.className = `result-row ${toneClass}`;
+        const msg = r.outcome === "treated" ? "Treated and stable"
+                  : r.outcome === "stabilized" ? "Not treated in time, but stabilized"
+                  : "Did not survive the wait";
+        row.innerHTML = `<span class="patient-name">${r.name}</span><span>${msg}</span>`;
+        list.appendChild(row);
+      });
+      wrap.appendChild(list);
+      const btn = document.createElement("button");
+      btn.className = "btn-continue";
+      btn.textContent = "Continue";
+      btn.onclick = advance;
+      wrap.appendChild(btn);
+    }
+    return wrap;
+  }
+
+  function renderChoice(step) {
+    const wrap = document.createElement("div");
+    wrap.className = "choice-block";
+    const prompt = document.createElement("p");
+    prompt.className = "choice-prompt";
+    prompt.textContent = step.prompt;
+    wrap.appendChild(prompt);
+    const list = document.createElement("div");
+    list.className = "choice-list";
+    step.options.forEach((opt, i) => {
+      const btn = document.createElement("button");
+      btn.className = "choice-row";
+      btn.innerHTML = `<span class="choice-index">${i + 1}</span><span>${opt.label}</span>`;
+      btn.onclick = () => makeChoice(step, opt);
+      list.appendChild(btn);
+    });
+    wrap.appendChild(list);
+    return wrap;
+  }
+
+  function renderFinalChoice(step) {
+    const wrap = renderChoice({
+      prompt: step.prompt,
+      options: step.options.map((label, i) => ({ label, effect: () => {}, }))
+    });
+    // override click behaviour for final choice (needs 1-based index, no per-option effect)
+    wrap.querySelectorAll(".choice-row").forEach((btn, i) => {
+      btn.onclick = () => makeFinalChoice(i + 1);
+    });
+    return wrap;
+  }
+
+  function renderDayEnd() {
+    const wrap = document.createElement("div");
+    wrap.className = "day-end";
+    wrap.innerHTML = `
+      <p class="day-end-title">End of day ${state.day}</p>
+      <p class="day-end-sub">Patients saved so far: ${state.patientsSaved} / ${state.patientsTotal}</p>
+      <button class="btn-continue">Start next day</button>
+    `;
+    wrap.querySelector("button").onclick = () => { state.day++; advance(); };
+    return wrap;
+  }
+
+  function renderEnding(ending) {
+    const wrap = document.createElement("div");
+    wrap.className = "ending-screen";
+    wrap.innerHTML = `
+      <div class="ecg">${ecgSvg()}</div>
+      <p class="ending-eyebrow">Ending</p>
+      <h1>${ending.title}</h1>
+      <p class="ending-text">${ending.text.replace(/\n\n/g, "</p><p class=\"ending-text\">")}</p>
+      <div class="final-stats"></div>
+      <button class="btn-continue" onclick="location.reload()">Play again</button>
+    `;
+    const stats = wrap.querySelector(".final-stats");
+    const items = [
+      ["Reputation", state.reputation],
+      ["Investigation", state.investigation],
+      ["Money", "$" + state.money.toLocaleString()],
+      ["Maya trust", state.mayaTrust],
+      ["Carter trust", state.carterTrust],
+      ["Blackwood", state.blackwood],
+      ["Patients saved", `${state.patientsSaved} / ${state.patientsTotal}`],
+    ];
+    items.forEach(([label, value]) => {
+      const d = document.createElement("div");
+      d.className = "final-stat";
+      d.innerHTML = `<span>${label}</span><strong>${value}</strong>`;
+      stats.appendChild(d);
+    });
+    return wrap;
+  }
+
+  function ecgSvg() {
+    return `<svg viewBox="0 0 300 40" preserveAspectRatio="none" class="ecg-svg">
+      <polyline points="0,20 40,20 55,20 65,6 75,34 85,20 100,20 130,20 145,20 155,10 165,30 175,20 190,20 300,20"/>
+    </svg>`;
+  }
+
+  return { start };
+})();
+
+if (typeof document !== "undefined") {
+  window.addEventListener("DOMContentLoaded", App.start);
+}
+
+</script>
+</body>
+</html>
