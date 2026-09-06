@@ -3,12 +3,7 @@ package laststory;
 import java.util.HashMap;
 import java.util.Map;
 
-/**
- * Tracks branching-story flags and hospital-wide totals across the
- * seven days. Scenes read and write this object instead of using
- * scattered booleans, which is what lets Day 6/7 react to choices
- * made all the way back on Day 1.
- */
+
 public class StoryState {
 
     private int day = 1;
