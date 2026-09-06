@@ -5,22 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>The Last Shift</title>
 <style>
-/* ===== Design tokens =====
-   Color: near-night hospital corridor + literal ER triage colors
-     --bg        #0d1218  background, corridor-at-night
-     --panel     #161d24  case-file / chrome panels
-     --panel-alt #1c252d  interactive rows
-     --border    #2b343c  hairlines
-     --text      #e7ecf1  primary text
-     --muted     #8b98a5  secondary text
-     --accent    #33d1ba  ECG teal — the one recurring signature mark
-     --warn      #e2a144  triage: serious
-     --crit      #e2574c  triage: critical
-     --ok        #4fae7c  triage: minor/moderate/stable
-   Type: Source Serif 4 for narrative (case-file prose), IBM Plex Mono
-     for UI chrome / data (vitals, buttons, tags) — the contrast mirrors
-     a real chart: typed narrative notes vs. printed monitor readouts.
-*/
+
 
 @import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
@@ -78,7 +63,7 @@ a:focus-visible {
   outline-offset: 2px;
 }
 
-/* ===== ECG motif — the one signature recurring element ===== */
+
 
 .ecg-svg {
   width: 100%;
@@ -99,7 +84,7 @@ a:focus-visible {
   to { stroke-dashoffset: 0; }
 }
 
-/* ===== Title screen ===== */
+
 
 .title-screen {
   text-align: center;
@@ -150,7 +135,7 @@ a:focus-visible {
   font-size: 0.9rem;
 }
 
-/* ===== Chrome (top bar + vitals) ===== */
+
 
 .chrome {
   border: 1px solid var(--border);
@@ -193,7 +178,6 @@ a:focus-visible {
   font-family: 'IBM Plex Mono', monospace;
 }
 
-/* ===== Day banner ===== */
 
 .day-banner {
   border: 1px solid var(--border);
@@ -207,7 +191,7 @@ a:focus-visible {
   font-weight: 600;
 }
 
-/* ===== Main panel ===== */
+
 
 .panel {
   border: 1px solid var(--border);
@@ -223,7 +207,7 @@ a:focus-visible {
   white-space: pre-line;
 }
 
-/* ---- scene art ---- */
+
 .scene-image {
   border: 1px solid var(--border);
   border-radius: 4px;
@@ -233,7 +217,7 @@ a:focus-visible {
 }
 .scene-svg { width: 100%; height: auto; display: block; }
 
-/* ---- dialogue ---- */
+
 .dialogue-row {
   display: flex;
   gap: 12px;
@@ -269,7 +253,7 @@ a:focus-visible {
   font-style: italic;
 }
 
-/* ---- sound toggle ---- */
+
 .sound-toggle {
   position: fixed;
   bottom: 18px;
@@ -320,7 +304,7 @@ a:focus-visible {
   color: #0d1218;
 }
 
-/* ===== Choices ===== */
+
 
 .choice-block { max-width: 68ch; }
 .choice-prompt {
@@ -357,7 +341,7 @@ a:focus-visible {
   flex-shrink: 0;
 }
 
-/* ===== Hospital shift / triage ===== */
+
 
 .shift-head {
   display: flex;
@@ -444,13 +428,13 @@ a:focus-visible {
 .result-row.tone-warn { border-left-color: var(--warn); }
 .result-row.tone-crit { border-left-color: var(--crit); }
 
-/* ===== Day end ===== */
+
 
 .day-end { text-align: left; }
 .day-end-title { font-size: 1.1rem; font-weight: 600; margin: 0 0 6px; }
 .day-end-sub { color: var(--muted); margin: 0 0 16px; font-family: 'IBM Plex Mono', monospace; font-size: 0.85rem; }
 
-/* ===== Ending ===== */
+
 
 .ending-screen {
   text-align: center;
@@ -497,7 +481,7 @@ a:focus-visible {
 }
 .final-stat span { color: var(--muted); }
 
-/* ===== Responsive ===== */
+
 
 @media (max-width: 480px) {
   body { padding: 20px 12px 48px; }
@@ -514,10 +498,7 @@ a:focus-visible {
 <body>
 <div id="app"></div>
 <script>
-// ===================== VISUAL ASSETS =====================
-// Hand-built inline SVG, matching the ECG-line visual identity.
-// No external images/fonts for art — keeps the file single-file and
-// avoids depicting real people (these are original fictional characters).
+
 
 const CHAR_COLORS = {
   ALEX: "#33d1ba",
@@ -685,7 +666,7 @@ function getPortrait(key) {
 
 </script>
 <script>
-// ===================== DATA: SEVERITY / DIFFICULTY =====================
+
 
 const SEVERITY = {
   MINOR:    { label: "Minor",    survive: 0.98, tone: "ok"   },
@@ -801,10 +782,7 @@ function resolveEnding(s, finalChoice) {
   return hero ? ENDINGS.HERO : ENDINGS.TRUTH;
 }
 
-// ===================== SCRIPT (the "story map") =====================
-// Step types: text, day, shift, choice, finalChoice, dayEnd
-// A "text" step has: scene (key into SCENES) + lines (array of N()/L() dialogue lines)
-// A "choice" option can carry its own scene + lines shown as the follow-up.
+
 
 function N(text) { return { speaker: "narration", text }; }
 function L(speaker, text) { return { speaker, text }; }
@@ -1003,11 +981,7 @@ if (typeof module !== "undefined") {
 
 </script>
 <script>
-// ===================== MUSIC ENGINE =====================
-// A small generative dark-ambient loop: two slightly detuned low
-// drones + a slow tremolo swell + occasional filtered noise "whispers".
-// No external audio files — everything is synthesized, so the game
-// stays a single self-contained HTML file.
+
 
 const MusicEngine = (() => {
   let ctx = null;
@@ -1146,11 +1120,7 @@ const MusicEngine = (() => {
 
 </script>
 <script>
-// ===================== ENGINE =====================
-// Depends on: SEVERITY, DIFFICULTY, newState, clamp/add* helpers,
-// ENDINGS, resolveEnding, buildScript, N, L  (game-data.js)
-// PORTRAITS, SCENES, getScene, getPortrait, CHAR_COLORS  (assets.js)
-// MusicEngine                                             (music.js)
+
 
 const App = (() => {
   let state = null;
