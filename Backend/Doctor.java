@@ -1,9 +1,5 @@
 package laststory;
 
-/**
- * A staff doctor. In this mini-project a Doctor simply represents
- * one unit of treatment capacity for the Hospital during a shift.
- */
 public class Doctor {
 
     private final String name;
