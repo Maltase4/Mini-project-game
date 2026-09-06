@@ -4,11 +4,6 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 
-/**
- * Drives the whole game: difficulty select -> prologue -> Day 1..7 ->
- * final choice -> ending. Each day method mirrors the "story map" from
- * the design doc: objective, main event, choices, flags.
- */
 public class GameManager {
 
     private final Scanner sc = new Scanner(System.in);
@@ -34,9 +29,7 @@ public class GameManager {
         System.out.println("\nThanks for playing THE LAST SHIFT.");
     }
 
-    // ---------------------------------------------------------------
-    // Setup
-    // ---------------------------------------------------------------
+  
 
     private void printTitle() {
         System.out.println("=========================================================");
@@ -57,9 +50,7 @@ public class GameManager {
         };
     }
 
-    // ---------------------------------------------------------------
-    // Prologue
-    // ---------------------------------------------------------------
+
 
     private void prologue() {
         printScene("""
@@ -84,9 +75,7 @@ public class GameManager {
         pause();
     }
 
-    // ---------------------------------------------------------------
-    // Day 1 - Something Is Wrong
-    // ---------------------------------------------------------------
+
 
     private void day1() {
         dayHeader(1, "Something Is Wrong");
@@ -132,9 +121,7 @@ public class GameManager {
         endOfDay();
     }
 
-    // ---------------------------------------------------------------
-    // Day 2 - The Missing Records
-    // ---------------------------------------------------------------
+
 
     private void day2() {
         dayHeader(2, "The Missing Records");
@@ -172,9 +159,7 @@ public class GameManager {
         endOfDay();
     }
 
-    // ---------------------------------------------------------------
-    // Day 3 - The Research Wing
-    // ---------------------------------------------------------------
+
 
     private void day3() {
         dayHeader(3, "The Research Wing");
@@ -225,9 +210,7 @@ public class GameManager {
         endOfDay();
     }
 
-    // ---------------------------------------------------------------
-    // Day 4 - Maya's Secret
-    // ---------------------------------------------------------------
+
 
     private void day4() {
         dayHeader(4, "Maya's Secret");
@@ -261,9 +244,7 @@ public class GameManager {
         endOfDay();
     }
 
-    // ---------------------------------------------------------------
-    // Day 5 - Blackwood's Deal
-    // ---------------------------------------------------------------
+
 
     private void day5() {
         dayHeader(5, "Blackwood's Deal");
@@ -311,9 +292,7 @@ public class GameManager {
         endOfDay();
     }
 
-    // ---------------------------------------------------------------
-    // Day 6 - Mass Casualty
-    // ---------------------------------------------------------------
+
 
     private void day6() {
         dayHeader(6, "Mass Casualty");
@@ -340,9 +319,7 @@ public class GameManager {
         endOfDay();
     }
 
-    // ---------------------------------------------------------------
-    // Day 7 - Room 417 + Final Choice
-    // ---------------------------------------------------------------
+ 
 
     private void day7() {
         dayHeader(7, "Room 417");
@@ -381,9 +358,7 @@ public class GameManager {
         printEnding(ending);
     }
 
-    // ---------------------------------------------------------------
-    // Helpers
-    // ---------------------------------------------------------------
+
 
     private void dayHeader(int day, String title) {
         System.out.println();
@@ -419,7 +394,7 @@ public class GameManager {
         System.out.printf("Patients saved: %d/%d%n", story.getPatientsSaved(), story.getPatientsTotal());
     }
 
-    /** Prints a numbered menu and returns the 1-based choice. */
+   
     private int choice(String prompt, String... options) {
         System.out.println();
         System.out.println(prompt);
@@ -435,7 +410,7 @@ public class GameManager {
                     return value;
                 }
             } catch (NumberFormatException ignored) {
-                // reprompt below
+                
             }
             System.out.print("Please enter a number between 1 and " + options.length + ": ");
         }
