@@ -1,32 +1,29 @@
 # The Last Shift — Java OOP Mini Project
 
-A console-based, story-driven hospital mystery game for your Java OOP
-project, built from the design doc you shared: a 7-day narrative with
-branching choices, persistent stats/flags, a hospital triage mini-game,
-and 5 possible endings.
+A console-based, story-driven hospital mystery game for Java OOP
+project where you play as the protagonist Alex Morgan, 
+a 7-day narrative with branching choices, 
+persistent stats/flags, and 5 possible endings.
 
-## How to run
+## How to run (browser)
 
 Requires JDK 17+ (uses `switch` expressions and text blocks).
 
-```bash
-cd src
-javac laststory/*.java -d ../out
-cd ..
-java -cp out laststory.Main
-```
+- Download All Backend and Frontend files
+- Launch html file
 
-Or just double check `javac -version` / `java -version` first if it
-complains.
-
+## How to run (terminal)
+-Go to Main.java file after downloading all files
+- Compile and run it with these commands:
+  `javac Main.java`
+  `java Main`
+  
 ## How it plays
 
-- Choose a difficulty (changes starting money / doctor count — never
-  the story itself, per the design doc).
+- Choose a difficulty
 - Each day: a **hospital shift** — you assign your limited doctors to
-  incoming patients (numbered menu, `0` to stop early). Untreated
-  serious/critical patients have a chance of dying, which costs
-  reputation and counts against your "patients saved" stat.
+  incoming patients, Untreated serious/critical patients have a chance of dying,
+  which costs reputation and counts against your "patients saved" stat.
 - Then a **story scene** with a numbered choice. Choices set flags and
   nudge stats (Maya's trust, Carter's trust, investigation progress,
   Blackwood's relationship, reputation, money).
