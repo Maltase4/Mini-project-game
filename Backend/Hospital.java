@@ -4,10 +4,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Scanner;
 
-/**
- * St. Mary's Hospital. Owns the doctors and runs the triage
- * mini-game that plays out at the start of every day.
- */
+
 public class Hospital {
 
     private final List<Doctor> doctors = new ArrayList<>();
@@ -26,11 +23,6 @@ public class Hospital {
         return doctors.size();
     }
 
-    /**
-     * Runs one shift: the player picks which patients to treat given
-     * limited doctor capacity. Untreated CRITICAL/SERIOUS patients risk
-     * dying, which hits reputation and the patientsSaved/Lost counters.
-     */
     public void runShift(List<Patient> incoming, Player player, StoryState story, Scanner sc) {
         System.out.println();
         System.out.println("==================== HOSPITAL SHIFT ====================");
@@ -113,7 +105,7 @@ public class Hospital {
                     return value;
                 }
             } catch (NumberFormatException ignored) {
-                // fall through to reprompt
+                
             }
             System.out.print("Please enter a number between " + min + " and " + max + ": ");
         }
