@@ -1,0 +1,1582 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The Last Shift</title>
+<style>
+/* ===== Design tokens =====
+   Color: near-night hospital corridor + literal ER triage colors
+     --bg        #0d1218  background, corridor-at-night
+     --panel     #161d24  case-file / chrome panels
+     --panel-alt #1c252d  interactive rows
+     --border    #2b343c  hairlines
+     --text      #e7ecf1  primary text
+     --muted     #8b98a5  secondary text
+     --accent    #33d1ba  ECG teal — the one recurring signature mark
+     --warn      #e2a144  triage: serious
+     --crit      #e2574c  triage: critical
+     --ok        #4fae7c  triage: minor/moderate/stable
+   Type: Source Serif 4 for narrative (case-file prose), IBM Plex Mono
+     for UI chrome / data (vitals, buttons, tags) — the contrast mirrors
+     a real chart: typed narrative notes vs. printed monitor readouts.
+*/
+
+@import url('https://fonts.googleapis.com/css2?family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600;1,8..60,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  --bg: #0d1218;
+  --panel: #161d24;
+  --panel-alt: #1c252d;
+  --border: #2b343c;
+  --text: #e7ecf1;
+  --muted: #8b98a5;
+  --accent: #33d1ba;
+  --warn: #e2a144;
+  --crit: #e2574c;
+  --ok: #4fae7c;
+}
+
+* { box-sizing: border-box; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+html, body {
+  margin: 0;
+  min-height: 100%;
+  background: var(--bg);
+  color: var(--text);
+}
+
+body {
+  font-family: 'Source Serif 4', Georgia, serif;
+  line-height: 1.6;
+  background-image:
+    repeating-linear-gradient(rgba(255,255,255,0.012) 0px, rgba(255,255,255,0.012) 1px, transparent 1px, transparent 3px),
+    radial-gradient(ellipse at 50% -10%, rgba(51,209,186,0.06), transparent 60%);
+  min-height: 100vh;
+  padding: 32px 20px 64px;
+}
+
+#app {
+  max-width: 640px;
+  margin: 0 auto;
+}
+
+button {
+  font-family: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+button:disabled { cursor: not-allowed; opacity: 0.45; }
+
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+/* ===== ECG motif — the one signature recurring element ===== */
+
+.ecg-svg {
+  width: 100%;
+  height: 32px;
+  display: block;
+}
+.ecg-svg polyline {
+  fill: none;
+  stroke: var(--accent);
+  stroke-width: 1.6;
+  stroke-linejoin: round;
+  stroke-linecap: round;
+  stroke-dasharray: 480;
+  stroke-dashoffset: 480;
+  animation: draw-ecg 1.4s ease-out forwards;
+}
+@keyframes draw-ecg {
+  to { stroke-dashoffset: 0; }
+}
+
+/* ===== Title screen ===== */
+
+.title-screen {
+  text-align: center;
+  padding-top: 8vh;
+}
+.title-screen .ecg { max-width: 260px; margin: 0 auto 28px; opacity: 0.85; }
+.title-screen h1 {
+  font-size: 2.6rem;
+  font-weight: 600;
+  margin: 0 0 14px;
+  letter-spacing: -0.01em;
+}
+.tagline {
+  color: var(--muted);
+  font-style: italic;
+  max-width: 46ch;
+  margin: 0 auto 40px;
+  font-size: 1.05rem;
+}
+.difficulty-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+.diff-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: 4px;
+  padding: 16px 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  transition: border-left-color 0.15s ease, background 0.15s ease;
+}
+.diff-card:hover, .diff-card:focus-visible {
+  border-left-color: var(--accent);
+  background: var(--panel-alt);
+}
+.diff-name {
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+  font-size: 0.95rem;
+}
+.diff-sub {
+  color: var(--muted);
+  font-size: 0.9rem;
+}
+
+/* ===== Chrome (top bar + vitals) ===== */
+
+.chrome {
+  border: 1px solid var(--border);
+  border-radius: 4px 4px 0 0;
+  border-bottom: none;
+  background: var(--panel);
+  overflow: hidden;
+}
+.chrome-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: 12px 16px 10px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+}
+.brand { color: var(--text); }
+.vitals {
+  display: flex;
+}
+.vital {
+  flex: 1;
+  padding: 10px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border-left: 1px solid var(--border);
+}
+.vital:first-child { border-left: none; }
+.vital-value {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.1rem;
+  font-weight: 600;
+}
+.vital-label {
+  font-size: 0.68rem;
+  color: var(--muted);
+  font-family: 'IBM Plex Mono', monospace;
+}
+
+/* ===== Day banner ===== */
+
+.day-banner {
+  border: 1px solid var(--border);
+  border-top: none;
+  background: var(--panel);
+  padding: 18px 16px 6px;
+}
+.day-ecg { max-width: 200px; margin-bottom: 10px; opacity: 0.7; }
+.day-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+/* ===== Main panel ===== */
+
+.panel {
+  border: 1px solid var(--border);
+  border-top: none;
+  background: var(--panel);
+  border-radius: 0 0 4px 4px;
+  padding: 22px 20px 20px;
+}
+
+.case-file { max-width: 68ch; }
+.case-text {
+  margin: 0 0 16px;
+  white-space: pre-line;
+}
+
+/* ---- scene art ---- */
+.scene-image {
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 18px;
+  line-height: 0;
+}
+.scene-svg { width: 100%; height: auto; display: block; }
+
+/* ---- dialogue ---- */
+.dialogue-row {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  margin-bottom: 14px;
+}
+.portrait {
+  flex-shrink: 0;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  overflow: hidden;
+  box-shadow: 0 0 0 1px var(--char-color, var(--border)) inset;
+}
+.portrait-svg { width: 100%; height: 100%; display: block; }
+.dialogue-bubble {
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--char-color, var(--border));
+  border-radius: 3px;
+  padding: 10px 14px;
+  flex: 1;
+}
+.dialogue-name {
+  display: block;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+.dialogue-text {
+  margin: 0;
+  font-style: italic;
+}
+
+/* ---- sound toggle ---- */
+.sound-toggle {
+  position: fixed;
+  bottom: 18px;
+  right: 18px;
+  z-index: 50;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.72rem;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  color: var(--muted);
+  border-radius: 20px;
+  padding: 8px 14px;
+  transition: border-color 0.15s ease, color 0.15s ease;
+}
+.sound-toggle::before {
+  content: "";
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--muted);
+  margin-right: 7px;
+}
+.sound-toggle.is-on {
+  color: var(--accent);
+  border-color: var(--accent);
+}
+.sound-toggle.is-on::before {
+  background: var(--accent);
+  box-shadow: 0 0 6px var(--accent);
+}
+.sound-toggle:hover { color: var(--text); }
+
+.btn-continue {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.85rem;
+  font-weight: 500;
+  background: transparent;
+  border: 1px solid var(--accent);
+  color: var(--accent);
+  border-radius: 3px;
+  padding: 10px 18px;
+  margin-top: 6px;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.btn-continue:hover {
+  background: var(--accent);
+  color: #0d1218;
+}
+
+/* ===== Choices ===== */
+
+.choice-block { max-width: 68ch; }
+.choice-prompt {
+  margin: 0 0 14px;
+  font-size: 1.05rem;
+}
+.choice-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.choice-row {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+  text-align: left;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-left: 3px solid transparent;
+  border-radius: 3px;
+  padding: 13px 16px;
+  font-size: 1rem;
+  transition: border-left-color 0.15s ease, transform 0.15s ease, background 0.15s ease;
+}
+.choice-row:hover, .choice-row:focus-visible {
+  border-left-color: var(--accent);
+  background: #212b34;
+  transform: translateX(2px);
+}
+.choice-index {
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--muted);
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+/* ===== Hospital shift / triage ===== */
+
+.shift-head {
+  display: flex;
+  justify-content: space-between;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.8rem;
+  color: var(--muted);
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+.assign-count { color: var(--text); }
+
+.patient-list, .result-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 18px;
+}
+
+.patient-row {
+  display: grid;
+  grid-template-columns: 1.1fr 1.3fr auto auto;
+  align-items: center;
+  gap: 10px;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: 3px;
+  padding: 11px 14px;
+  text-align: left;
+  font-size: 0.92rem;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.patient-row:not(:disabled):hover { background: #212b34; }
+.patient-row.assigned {
+  border-left-color: var(--accent);
+  background: #16302c;
+}
+.patient-name { font-weight: 600; }
+.patient-condition { color: var(--muted); }
+.patient-severity {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.78rem;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.patient-severity::before {
+  content: "";
+  width: 8px;
+  height: 8px;
+  border-radius: 1px;
+  display: inline-block;
+  background: var(--muted);
+}
+.tone-ok .patient-severity::before { background: var(--ok); }
+.tone-warn .patient-severity::before { background: var(--warn); }
+.tone-crit .patient-severity::before { background: var(--crit); }
+.tone-ok .patient-severity { color: var(--ok); }
+.tone-warn .patient-severity { color: var(--warn); }
+.tone-crit .patient-severity { color: var(--crit); }
+
+.patient-action {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.78rem;
+  color: var(--muted);
+  justify-self: end;
+}
+.patient-row.assigned .patient-action { color: var(--accent); }
+
+.result-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  background: var(--panel-alt);
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--border);
+  border-radius: 3px;
+  padding: 11px 14px;
+  font-size: 0.92rem;
+}
+.result-row.tone-ok { border-left-color: var(--ok); }
+.result-row.tone-warn { border-left-color: var(--warn); }
+.result-row.tone-crit { border-left-color: var(--crit); }
+
+/* ===== Day end ===== */
+
+.day-end { text-align: left; }
+.day-end-title { font-size: 1.1rem; font-weight: 600; margin: 0 0 6px; }
+.day-end-sub { color: var(--muted); margin: 0 0 16px; font-family: 'IBM Plex Mono', monospace; font-size: 0.85rem; }
+
+/* ===== Ending ===== */
+
+.ending-screen {
+  text-align: center;
+  padding-top: 6vh;
+}
+.ending-screen .ecg { max-width: 260px; margin: 0 auto 20px; }
+.ending-eyebrow {
+  font-family: 'IBM Plex Mono', monospace;
+  color: var(--muted);
+  font-size: 0.8rem;
+  margin: 0 0 6px;
+}
+.ending-screen h1 {
+  font-size: 2.2rem;
+  margin: 0 0 22px;
+}
+.ending-text {
+  text-align: left;
+  max-width: 60ch;
+  margin: 0 auto 14px;
+  color: var(--text);
+}
+.ending-text-wrap {
+  text-align: left;
+  max-width: 60ch;
+  margin: 0 auto 14px;
+}
+.final-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  max-width: 60ch;
+  margin: 22px auto 28px;
+  text-align: left;
+}
+.final-stat {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  border-bottom: 1px solid var(--border);
+  padding: 6px 2px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.85rem;
+}
+.final-stat span { color: var(--muted); }
+
+/* ===== Responsive ===== */
+
+@media (max-width: 480px) {
+  body { padding: 20px 12px 48px; }
+  .title-screen h1 { font-size: 2rem; }
+  .patient-row { grid-template-columns: 1fr; gap: 4px; }
+  .patient-action { justify-self: start; }
+  .vitals { flex-wrap: wrap; }
+  .vital { min-width: 33%; border-left: none; border-top: 1px solid var(--border); }
+  .final-stats { grid-template-columns: 1fr; }
+}
+
+</style>
+</head>
+<body>
+<div id="app"></div>
+<script>
+// ===================== VISUAL ASSETS =====================
+// Hand-built inline SVG, matching the ECG-line visual identity.
+// No external images/fonts for art — keeps the file single-file and
+// avoids depicting real people (these are original fictional characters).
+
+const CHAR_COLORS = {
+  ALEX: "#33d1ba",
+  MAYA: "#4fae7c",
+  CARTER: "#8fa6bd",
+  BLACKWOOD: "#e2574c",
+  VALE: "#e2a144",
+};
+
+function portraitFrame(key, inner) {
+  const c = CHAR_COLORS[key] || "#8b98a5";
+  return `<svg viewBox="0 0 96 96" class="portrait-svg">
+    <circle cx="48" cy="48" r="46" fill="#161d24" stroke="${c}" stroke-width="2"/>
+    ${inner}
+  </svg>`;
+}
+
+const PORTRAITS = {
+  ALEX: portraitFrame("ALEX", `
+    <path d="M48 30a14 14 0 1 1 0 28 14 14 0 0 1 0-28Z" fill="none" stroke="#33d1ba" stroke-width="2"/>
+    <path d="M22 82c3-16 14-24 26-24s23 8 26 24" fill="none" stroke="#33d1ba" stroke-width="2"/>
+    <path d="M36 62v6M60 62v6" stroke="#33d1ba" stroke-width="2"/>
+    <path d="M40 74h16" stroke="#33d1ba" stroke-width="2"/>
+  `),
+  MAYA: portraitFrame("MAYA", `
+    <path d="M48 32a13 13 0 1 1 0 26 13 13 0 0 1 0-26Z" fill="none" stroke="#4fae7c" stroke-width="2"/>
+    <path d="M23 82c3-15 13-23 25-23s22 8 25 23" fill="none" stroke="#4fae7c" stroke-width="2"/>
+    <path d="M32 30c6-8 26-8 32 0" fill="none" stroke="#4fae7c" stroke-width="2"/>
+    <path d="M42 20h12v8H42z" fill="none" stroke="#4fae7c" stroke-width="2"/>
+    <path d="M46 22v4M44 24h4" stroke="#4fae7c" stroke-width="1.4"/>
+  `),
+  CARTER: portraitFrame("CARTER", `
+    <path d="M48 30a14 14 0 1 1 0 28 14 14 0 0 1 0-28Z" fill="none" stroke="#8fa6bd" stroke-width="2"/>
+    <path d="M20 84c3-17 15-26 28-26s25 9 28 26" fill="none" stroke="#8fa6bd" stroke-width="2"/>
+    <path d="M40 56c3 3 13 3 16 0" fill="none" stroke="#8fa6bd" stroke-width="2"/>
+    <circle cx="48" cy="70" r="6" fill="none" stroke="#8fa6bd" stroke-width="1.6"/>
+    <path d="M48 76v-14M48 62c-6 0-10-4-10-9" fill="none" stroke="#8fa6bd" stroke-width="1.4"/>
+  `),
+  BLACKWOOD: portraitFrame("BLACKWOOD", `
+    <path d="M48 30a13 13 0 1 1 0 26 13 13 0 0 1 0-26Z" fill="none" stroke="#e2574c" stroke-width="2"/>
+    <path d="M18 84c4-18 16-27 30-27s26 9 30 27" fill="none" stroke="#e2574c" stroke-width="2"/>
+    <path d="M34 60l14 8 14-8" fill="none" stroke="#e2574c" stroke-width="2"/>
+    <path d="M48 68v14" stroke="#e2574c" stroke-width="2"/>
+  `),
+  VALE: portraitFrame("VALE", `
+    <path d="M48 31a13 13 0 1 1 0 26 13 13 0 0 1 0-26Z" fill="none" stroke="#e2a144" stroke-width="2"/>
+    <path d="M22 84c3-17 14-25 26-25s23 8 26 25" fill="none" stroke="#e2a144" stroke-width="2"/>
+    <path d="M40 42c1 3 1 6-1 8M56 42c-1 3-1 6 1 8" stroke="#e2a144" stroke-width="1.6"/>
+    <path d="M30 28c4-6 8-8 8-8M66 28c-4-6-8-8-8-8" stroke="#e2a144" stroke-width="1.4"/>
+    <path d="M40 52h16" stroke="#e2a144" stroke-width="1.6"/>
+  `),
+};
+
+function sceneFrame(inner, tone) {
+  const strokeColor = { ok: "#4fae7c", warn: "#e2a144", crit: "#e2574c" }[tone] || "#33d1ba";
+  return `<svg viewBox="0 0 400 170" class="scene-svg" preserveAspectRatio="xMidYMid slice">
+    <rect x="0" y="0" width="400" height="170" fill="#11161c"/>
+    <rect x="0" y="0" width="400" height="170" fill="url(#vignette)"/>
+    <defs>
+      <radialGradient id="vignette" cx="50%" cy="35%" r="75%">
+        <stop offset="0%" stop-color="${strokeColor}" stop-opacity="0.10"/>
+        <stop offset="100%" stop-color="#000000" stop-opacity="0.35"/>
+      </radialGradient>
+    </defs>
+    <g stroke="${strokeColor}" stroke-width="1.6" fill="none" opacity="0.9">
+      ${inner}
+    </g>
+  </svg>`;
+}
+
+const SCENES = {
+  ENTRANCE: sceneFrame(`
+    <rect x="60" y="40" width="280" height="110" />
+    <path d="M60 90h280M150 90v60M250 90v60" />
+    <path d="M170 60h60v30h-60z" />
+    <path d="M0 20l30 150M40 10l25 160M380 15l-25 155" stroke-width="1" opacity="0.5" />
+    <circle cx="120" cy="70" r="3" fill="#33d1ba" opacity="0.6"/>
+    <circle cx="280" cy="70" r="3" fill="#33d1ba" opacity="0" />
+  `, "ok"),
+  WARD: sceneFrame(`
+    <path d="M20 140h360" />
+    <path d="M60 140V90h50v50M180 140V90h50v50M300 140V90h40v50" />
+    <path d="M0 60h400" opacity="0.3" />
+    <circle cx="85" cy="70" r="8" opacity="0.5"/>
+    <circle cx="205" cy="70" r="8" opacity="0.5"/>
+  `, "ok"),
+  RECORDS_OFFICE: sceneFrame(`
+    <rect x="80" y="40" width="240" height="110" />
+    <path d="M80 70h240M80 100h240M80 130h240" />
+    <rect x="150" y="70" width="40" height="30" opacity="0.15" fill="#e2574c" stroke="none"/>
+    <path d="M150 70v30h40V70" stroke="#e2574c"/>
+  `, "warn"),
+  RESEARCH_WING: sceneFrame(`
+    <rect x="120" y="30" width="160" height="120" />
+    <path d="M120 30l160 120M280 30L120 150" opacity="0.35" />
+    <rect x="180" y="70" width="40" height="60" />
+    <circle cx="200" cy="100" r="4" fill="#e2574c" stroke="none"/>
+  `, "crit"),
+  DIRECTORS_OFFICE: sceneFrame(`
+    <rect x="40" y="100" width="150" height="45" />
+    <path d="M220 30v120M220 30h140v120M240 50h100M240 70h100M240 90h100" opacity="0.5" />
+    <path d="M60 100V60h40v40" />
+  `, "crit"),
+  CRASH_SITE: sceneFrame(`
+    <path d="M20 140h360" />
+    <rect x="60" y="90" width="90" height="40" transform="rotate(-8 105 110)" />
+    <rect x="220" y="100" width="70" height="35" />
+    <circle cx="340" cy="60" r="14" stroke="#e2574c">
+      <animate attributeName="opacity" values="1;0.2;1" dur="1.1s" repeatCount="indefinite"/>
+    </circle>
+  `, "crit"),
+  TRAUMA_BAY: sceneFrame(`
+    <circle cx="200" cy="40" r="30" opacity="0.5"/>
+    <path d="M140 140h120M160 140V110h40v30" />
+    <path d="M170 60l10 10-10 10 10 10" opacity="0.6" />
+  `, "warn"),
+  ROOM_417: sceneFrame(`
+    <rect x="150" y="30" width="100" height="120" />
+    <path d="M165 40h20v10h-20zM185 40h20v10h-20zM205 40h20v10h-20z" opacity="0.5"/>
+    <path d="M165 60h20v10h-20zM185 60h20v10h-20zM205 60h20v10h-20z" opacity="0.5"/>
+    <text x="200" y="115" font-family="IBM Plex Mono, monospace" font-size="22" fill="#e2574c" stroke="none" text-anchor="middle">417</text>
+  `, "crit"),
+  STAFF_ROOM: sceneFrame(`
+    <rect x="140" y="90" width="120" height="4" />
+    <path d="M150 94v30M250 94v30" />
+    <rect x="300" y="40" width="70" height="80" opacity="0.4"/>
+  `, "ok"),
+  CORRIDOR: sceneFrame(`
+    <path d="M0 150L160 90M400 150L240 90" />
+    <path d="M160 90h80v-10h-80z" opacity="0.4" />
+    <circle cx="200" cy="40" r="4" fill="#33d1ba" stroke="none"/>
+  `, "ok"),
+  END_HERO: sceneFrame(`
+    <path d="M0 130h400" />
+    <path d="M40 130V90h30v40M100 130V70h40v60M170 130V50h50v80M260 130V85h35v45M330 130V100h30v30" />
+    <path d="M0 40h400" opacity="0.3" stroke-dasharray="2 6"/>
+    <circle cx="200" cy="35" r="18" opacity="0.7"/>
+  `, "ok"),
+  END_TRUTH: sceneFrame(`
+    <path d="M60 140h280" />
+    <path d="M80 140V80M120 140V80M160 140V80M200 140V80M240 140V80M280 140V80M320 140V80" />
+    <path d="M60 80h280l-140-50z" />
+  `, "ok"),
+  END_DEAL: sceneFrame(`
+    <rect x="60" y="20" width="280" height="120" />
+    <path d="M60 50h280M60 80h280M60 110h280M130 20v120M200 20v120M270 20v120" opacity="0.5"/>
+  `, "crit"),
+  END_SILENCE: sceneFrame(`
+    <path d="M0 150L160 95M400 150L240 95" />
+    <path d="M160 95h80v-8h-80z" opacity="0.25"/>
+  `, "warn"),
+  END_COLLAPSE: sceneFrame(`
+    <rect x="120" y="40" width="160" height="100" opacity="0.5"/>
+    <path d="M120 40l160 100M280 40L120 140" stroke="#e2574c" />
+    <path d="M100 90h200" stroke="#e2574c" stroke-width="4" opacity="0.7"/>
+  `, "crit"),
+};
+
+function getScene(key) {
+  return SCENES[key] || SCENES.CORRIDOR;
+}
+function getPortrait(key) {
+  return PORTRAITS[key] || null;
+}
+
+</script>
+<script>
+// ===================== DATA: SEVERITY / DIFFICULTY =====================
+
+const SEVERITY = {
+  MINOR:    { label: "Minor",    survive: 0.98, tone: "ok"   },
+  MODERATE: { label: "Moderate", survive: 0.85, tone: "ok"   },
+  SERIOUS:  { label: "Serious",  survive: 0.45, tone: "warn" },
+  CRITICAL: { label: "Critical", survive: 0.15, tone: "crit" },
+};
+
+const DIFFICULTY = {
+  EASY:   { label: "Easy",   sub: "More funding, more doctors, gentler cases.", money: 25000, doctors: 5 },
+  NORMAL: { label: "Normal", sub: "A fair fight. Balanced funding and staff.",  money: 15000, doctors: 4 },
+  HARD:   { label: "Hard",   sub: "Tight budget, short-staffed, brutal cases.", money: 10000, doctors: 3 },
+};
+
+// ===================== STATE =====================
+
+function newState(difficultyKey) {
+  const d = DIFFICULTY[difficultyKey];
+  return {
+    difficultyKey,
+    money: d.money,
+    doctors: d.doctors,
+    beds: d.doctors + 2,
+    reputation: 50,
+    investigation: 0,
+    mayaTrust: 50,
+    carterTrust: 50,
+    blackwood: 20,
+    flags: {},
+    patientsSaved: 0,
+    patientsLost: 0,
+    patientsTotal: 0,
+    evidenceCollected: false,
+    day: 1,
+  };
+}
+
+function clamp(v) { return Math.max(0, Math.min(100, v)); }
+function addMoney(s, n) { s.money = Math.max(0, s.money + n); }
+function addRep(s, n) { s.reputation = clamp(s.reputation + n); }
+function addInv(s, n) { s.investigation = clamp(s.investigation + n); }
+function addMaya(s, n) { s.mayaTrust = clamp(s.mayaTrust + n); }
+function addCarter(s, n) { s.carterTrust = clamp(s.carterTrust + n); }
+function addBlackwood(s, n) { s.blackwood = clamp(s.blackwood + n); }
+function setFlag(s, k) { s.flags[k] = true; }
+function hasFlag(s, k) { return !!s.flags[k]; }
+function saveRate(s) { return s.patientsTotal === 0 ? 1 : s.patientsSaved / s.patientsTotal; }
+
+// ===================== ENDINGS =====================
+
+const ENDINGS = {
+  HERO: {
+    title: "The Hero",
+    scene: "END_HERO",
+    lines: [
+      N("You expose Project Orpheus AND keep St. Mary's alive. The government takes over the research program; the treatment is eventually redesigned and becomes legitimate."),
+      N("Maya walks into your office."),
+      L("MAYA", "Ready for another impossible week?"),
+      L("ALEX", "Absolutely not."),
+      N("Maya laughs. The phone rings."),
+      L("ALEX", "...I'll get it."),
+    ],
+  },
+  TRUTH: {
+    title: "The Truth",
+    scene: "END_TRUTH",
+    lines: [
+      N("Alex exposes Project Orpheus. The hospital is investigated and Blackwood is arrested. St. Mary's closes for a time, then reopens under new management. Maya and Carter return."),
+      N("You couldn't save everyone. But you stopped the people who were willing to sacrifice others for money. Some battles aren't won by saving a life — they're won by refusing to let others be sacrificed."),
+    ],
+  },
+  DEAL: {
+    title: "The Deal",
+    scene: "END_DEAL",
+    lines: [
+      N("Alex accepts the promotion and becomes head of emergency medicine. Salary up. Hospital profitable. Project Orpheus continues."),
+      L("BLACKWOOD", "Congratulations, Doctor."),
+      N("Alex looks through the glass at the emergency room. A new patient is wheeled in. A familiar blood-test result appears on the screen. Alex knows exactly what it means."),
+    ],
+  },
+  SILENCE: {
+    title: "The Silence",
+    scene: "END_SILENCE",
+    lines: [
+      N("You destroy the evidence. The hospital survives. Your colleagues survive. But you know what happened."),
+      N("Maya eventually leaves. Carter retires. Years later, a new doctor asks:"),
+      N('"Was this always how things were?"'),
+      N('Alex looks at them. "No." "What happened?" Alex doesn\'t answer.'),
+    ],
+  },
+  COLLAPSE: {
+    title: "Hospital Collapse",
+    scene: "END_COLLAPSE",
+    lines: [
+      N("Too many patients were lost. Reputation and funding ran out. The government shuts down the emergency department."),
+      N("The investigation was never completed. Whatever was happening at St. Mary's remained buried. For now."),
+    ],
+  },
+};
+
+function resolveEnding(s, finalChoice) {
+  const collapsed = s.reputation < 20 || s.money <= 0 || saveRate(s) < 0.4;
+  if (collapsed) return ENDINGS.COLLAPSE;
+  if (finalChoice === 4) return ENDINGS.DEAL;
+  if (finalChoice === 3) return ENDINGS.SILENCE;
+  const hero =
+    s.investigation >= 80 &&
+    s.evidenceCollected &&
+    s.mayaTrust >= 70 &&
+    s.carterTrust >= 70 &&
+    saveRate(s) >= 0.9 &&
+    s.reputation >= 80;
+  return hero ? ENDINGS.HERO : ENDINGS.TRUTH;
+}
+
+// ===================== SCRIPT (the "story map") =====================
+// Step types: text, day, shift, choice, finalChoice, dayEnd
+// A "text" step has: scene (key into SCENES) + lines (array of N()/L() dialogue lines)
+// A "choice" option can carry its own scene + lines shown as the follow-up.
+
+function N(text) { return { speaker: "narration", text }; }
+function L(speaker, text) { return { speaker, text }; }
+
+function buildScript() {
+  return [
+    { type: "text", scene: "ENTRANCE", lines: [
+        N('It\'s raining. St. Mary\'s Hospital looks old — half the lights in the entrance are broken. A handwritten sign reads: "EMERGENCY DEPARTMENT — PLEASE BE PATIENT."'),
+        N("Dr. Daniel Carter, the senior physician, barely looks up."),
+        L("CARTER", "You're Morgan? Good. You're on emergency."),
+        L("ALEX", "I thought there were two senior doctors."),
+        L("CARTER", "There were."),
+        N("He walks off."),
+        L("ALEX", "What happened to the other one?"),
+        L("CARTER", "He quit."),
+        N("Later, Maya — a nurse who's worked here six years — pulls you aside, nervous."),
+        L("MAYA", "Three patients came in last night. Different ages, different conditions. They all had the same blood abnormality."),
+        L("ALEX", "That's unusual."),
+        L("MAYA", "Very. And nobody wants to talk about it."),
+    ]},
+
+    { type: "day", day: 1, title: "Something Is Wrong" },
+    { type: "shift", patients: [
+        { name: "Patient 101", condition: "Broken arm", severity: "MINOR" },
+        { name: "Patient 102", condition: "Fever", severity: "MODERATE" },
+        { name: "Patient 103", condition: "Chest pain", severity: "SERIOUS" },
+        { name: "Patient 104", condition: "Severe bleeding", severity: "CRITICAL" },
+    ]},
+    { type: "text", scene: "WARD", lines: [
+        N('Patient 103\'s chart says they were admitted to St. Mary\'s three months ago and "discharged successfully." But the patient insists they\'ve never set foot here before.'),
+    ]},
+    { type: "choice", prompt: "What do you do?", options: [
+        { label: "Tell Maya about the discrepancy", effect: s => { setFlag(s,"toldMaya"); addMaya(s,10); addInv(s,10); },
+          scene: "CORRIDOR", lines: [ L("MAYA", "That matches what I've been seeing. This isn't the first time.") ] },
+        { label: "Report it to Dr. Carter", effect: s => { setFlag(s,"toldCarter"); addCarter(s,8); addInv(s,5); },
+          scene: "DIRECTORS_OFFICE", lines: [ L("CARTER", "Keep this between us. For now.") ] },
+        { label: "Ignore it", effect: s => { setFlag(s,"ignoredDay1"); addInv(s,-5); },
+          scene: "WARD", lines: [ N("You file it away as a clerical error. It nags at you anyway.") ] },
+    ]},
+    { type: "dayEnd" },
+
+    { type: "day", day: 2, title: "The Missing Records" },
+    { type: "shift", patients: [
+        { name: "Patient 205", condition: "Fracture", severity: "MODERATE" },
+        { name: "Patient 206", condition: "Appendicitis", severity: "SERIOUS" },
+        { name: "Patient 207", condition: "Allergic reaction", severity: "MODERATE" },
+    ]},
+    { type: "text", scene: "RECORDS_OFFICE", lines: [
+        N("Patient 103's file is gone — paper AND digital."),
+        L("MAYA", "Someone deleted it."),
+        L("ALEX", "Who has access?"),
+        L("MAYA", "Doctors. Administration. IT."),
+        L("ALEX", "Anyone else?"),
+        L("MAYA", "The research department."),
+        N("You learn St. Mary's has a private research wing, supposedly developing a treatment for a rare disease. It doesn't accept visitors."),
+    ]},
+    { type: "choice", prompt: "How do you respond?", options: [
+        { label: "Push Maya for more details about the research wing", effect: s => { setFlag(s,"pushedMaya"); addMaya(s,5); addInv(s,10); },
+          scene: "CORRIDOR", lines: [ L("MAYA", "I don't know what's really going on in there. I just know people go in and don't come out the same.") ] },
+        { label: "Quietly note it and move on for now", effect: s => { addInv(s,3); },
+          scene: "WARD", lines: [ N("You keep it to yourself for now, but the thought won't leave you.") ] },
+    ]},
+    { type: "dayEnd" },
+
+    { type: "day", day: 3, title: "The Research Wing" },
+    { type: "shift", patients: [
+        { name: "Patient 308", condition: "Chest trauma", severity: "CRITICAL" },
+        { name: "Patient 309", condition: "Migraine", severity: "MINOR" },
+        { name: "Patient 310", condition: "Laceration", severity: "MODERATE" },
+    ]},
+    { type: "text", scene: "WARD", lines: [
+        N("While hunting for medication overnight, you find an old access card belonging to Dr. Ethan Vale — the doctor who supposedly quit. The card still works."),
+    ]},
+    { type: "choice", prompt: "What do you do with the card?", options: [
+        { label: "Enter the research wing", effect: s => { setFlag(s,"enteredResearchWing"); addInv(s,20); setFlag(s,"foundOrpheus"); },
+          scene: "RESEARCH_WING", lines: [
+            N("Dozens of patient files line the shelves — every one shows the same strange blood abnormality. Worse: they aren't listed as patients. They're listed as TRIAL SUBJECTS."),
+            N('You find a folder labeled PROJECT ORPHEUS. Footsteps approach. You slip out just in time.'),
+          ]},
+        { label: "Give the card to hospital administration", effect: s => { setFlag(s,"reportedCard"); addCarter(s,5); addInv(s,-5); },
+          scene: "DIRECTORS_OFFICE", lines: [ N("Administration thanks you and quietly pockets the card. Nothing more is said.") ] },
+        { label: "Keep the card and investigate later", effect: s => { setFlag(s,"keptCard"); addInv(s,5); },
+          scene: "WARD", lines: [ N("You slide the card into your coat pocket. It can wait — for now.") ] },
+    ]},
+    { type: "dayEnd" },
+
+    { type: "day", day: 4, title: "Maya's Secret" },
+    { type: "shift", patients: [
+        { name: "Patient 411", condition: "Fracture", severity: "MODERATE" },
+        { name: "Patient 412", condition: "Cardiac event", severity: "CRITICAL" },
+        { name: "Patient 413", condition: "Fever", severity: "MINOR" },
+    ]},
+    { type: "text", scene: "STAFF_ROOM", lines: [
+        N("You confront Maya."),
+        L("MAYA", "I wanted to tell someone."),
+        L("ALEX", "How long have you known?"),
+        L("MAYA", "Two years."),
+        L("ALEX", "Two years?"),
+        L("MAYA", "I was scared."),
+        L("ALEX", "People are getting hurt."),
+        L("MAYA", "I know."),
+        N("She explains: the hospital has been secretly testing an experimental neurological treatment — Project Orpheus — on patients. It can potentially cure a serious disease, but it has dangerous side effects the hospital has hidden because the research is worth millions. Dr. Vale tried to expose them. That's why he \"quit.\""),
+    ]},
+    { type: "choice", prompt: "How do you respond to Maya?", options: [
+        { label: "Reassure her — you're in this together", effect: s => { addMaya(s,15); setFlag(s,"helpedMaya"); },
+          scene: "STAFF_ROOM", lines: [ L("MAYA", "Thank you. I don't feel so alone in this anymore.") ] },
+        { label: "Press her harder on what else she's hiding", effect: s => { addMaya(s,-5); addInv(s,8); },
+          scene: "STAFF_ROOM", lines: [ L("MAYA", "There's... more. But not here. Not now.") ] },
+    ], after: s => { s.evidenceCollected = hasFlag(s,"foundOrpheus") && s.investigation >= 30; } },
+    { type: "dayEnd" },
+
+    { type: "day", day: 5, title: "Blackwood's Deal" },
+    { type: "shift", patients: [
+        { name: "Patient 520", condition: "Broken leg", severity: "MODERATE" },
+        { name: "Patient 521", condition: "Internal bleeding", severity: "CRITICAL" },
+    ]},
+    { type: "text", scene: "DIRECTORS_OFFICE", lines: [
+        N("Director Richard Blackwood summons you."),
+        L("BLACKWOOD", "You're asking a lot of questions, Doctor."),
+        L("ALEX", "I'm treating patients."),
+        L("BLACKWOOD", "No. You're investigating."),
+        N("He offers a deal: stop asking questions, and you'll get your own department."),
+        L("ALEX", "What about the patients?"),
+        L("BLACKWOOD", "Patients come and go. Money keeps hospitals alive."),
+    ]},
+    { type: "choice", prompt: "Your move:", options: [
+        { label: "Accept the deal", effect: s => { setFlag(s,"acceptedDeal"); addBlackwood(s,30); addInv(s,-15); addMoney(s,3000); },
+          scene: "DIRECTORS_OFFICE", lines: [ L("BLACKWOOD", "Smart choice, Doctor.") ] },
+        { label: "Refuse outright", effect: s => { setFlag(s,"refusedDeal"); addBlackwood(s,-20); addRep(s,5); addInv(s,5); },
+          scene: "DIRECTORS_OFFICE", lines: [ L("BLACKWOOD", "You'll regret that.") ] },
+        { label: "Pretend to accept, secretly keep gathering evidence", effect: s => { setFlag(s,"pretendedToAccept"); addBlackwood(s,10); addInv(s,10); },
+          scene: "CORRIDOR", lines: [ N("You force a thin smile and nod. Inside, you're already planning your next move.") ] },
+    ]},
+    { type: "dayEnd" },
+
+    { type: "day", day: 6, title: "Mass Casualty" },
+    { type: "text", scene: "CRASH_SITE", lines: [
+        N("A bus has crashed near the hospital. Fifteen patients are incoming — four critical, six serious, five moderate. Your doctors and beds are stretched to the limit."),
+    ]},
+    { type: "shift", patients: [
+        { name: "Crash Victim A", condition: "Trauma", severity: "CRITICAL" },
+        { name: "Crash Victim B", condition: "Trauma", severity: "CRITICAL" },
+        { name: "Crash Victim C", condition: "Trauma", severity: "CRITICAL" },
+        { name: "Crash Victim D", condition: "Trauma", severity: "CRITICAL" },
+        { name: "Crash Victim E", condition: "Trauma", severity: "SERIOUS" },
+        { name: "Crash Victim F", condition: "Trauma", severity: "SERIOUS" },
+        { name: "Crash Victim G", condition: "Trauma", severity: "SERIOUS" },
+        { name: "Crash Victim H", condition: "Trauma", severity: "SERIOUS" },
+        { name: "Crash Victim I", condition: "Trauma", severity: "SERIOUS" },
+        { name: "Crash Victim J", condition: "Trauma", severity: "SERIOUS" },
+        { name: "Crash Victim K", condition: "Trauma", severity: "MODERATE" },
+        { name: "Crash Victim L", condition: "Trauma", severity: "MODERATE" },
+        { name: "Crash Victim M", condition: "Trauma", severity: "MODERATE" },
+        { name: "Crash Victim N", condition: "Trauma", severity: "MODERATE" },
+        { name: "Crash Victim O", condition: "Trauma", severity: "MODERATE" },
+    ]},
+    { type: "text", scene: "TRAUMA_BAY", lines: [
+        N("Amid the chaos, Maya recognizes one of the crash victims: Dr. Vale. He's alive — barely. Before surgery, he grabs your wrist."),
+        L("VALE", "Room 417. Everything... is in Room 417."),
+        N("He loses consciousness."),
+    ]},
+    { type: "dayEnd" },
+
+    { type: "day", day: 7, title: "Room 417" },
+    { type: "text", scene: "ROOM_417", lines: [
+        N("Inside Room 417 is a server holding years of research data. Project Orpheus wasn't originally meant to harm anyone — the treatment genuinely worked. But when the hospital discovered a side effect could be extremely profitable, they kept the trial running instead of stopping it. Hundreds of patients were affected. You now have the evidence."),
+    ], after: s => { if (hasFlag(s,"enteredResearchWing")) s.evidenceCollected = true; } },
+    { type: "text", scene: "ROOM_417", lines: [
+        N("Blackwood catches you at the server."),
+        L("BLACKWOOD", "You have no idea what you're doing."),
+        L("ALEX", "I know exactly what I'm doing."),
+        L("BLACKWOOD", "If this gets out, St. Mary's closes."),
+        L("ALEX", "Then maybe it should."),
+        L("BLACKWOOD", "Think carefully."),
+        N("He sets a USB drive on the table."),
+        L("BLACKWOOD", "Give me the evidence, and I'll make sure everyone walks away."),
+    ]},
+    { type: "finalChoice", prompt: "Final decision — what do you do with the evidence?", options: [
+        "Release the evidence publicly",
+        "Give the evidence to the authorities",
+        "Destroy the evidence and protect the hospital",
+        "Give the evidence to Blackwood",
+    ]},
+  ];
+}
+
+// quick sanity check when run under node
+if (typeof module !== "undefined") {
+  const s = newState("NORMAL");
+  const script = buildScript();
+  console.log("Steps:", script.length);
+  console.log("Initial state OK:", JSON.stringify(s).length > 0);
+  const ending = resolveEnding(s, 2);
+  console.log("Sample ending resolves to:", ending.title);
+}
+
+</script>
+<script>
+// ===================== MUSIC ENGINE =====================
+// A small generative dark-ambient loop: two slightly detuned low
+// drones + a slow tremolo swell + occasional filtered noise "whispers".
+// No external audio files — everything is synthesized, so the game
+// stays a single self-contained HTML file.
+
+const MusicEngine = (() => {
+  let ctx = null;
+  let master = null;
+  let playing = false;
+  let whisperTimer = null;
+  let nodes = [];
+
+  function supported() {
+    return typeof window !== "undefined" &&
+      (window.AudioContext || window.webkitAudioContext);
+  }
+
+  function ensureContext() {
+    if (!ctx) {
+      const Ctx = window.AudioContext || window.webkitAudioContext;
+      ctx = new Ctx();
+      master = ctx.createGain();
+      master.gain.value = 0.0;
+      master.connect(ctx.destination);
+    }
+    return ctx;
+  }
+
+  function makeNoiseBuffer(duration) {
+    const bufferSize = ctx.sampleRate * duration;
+    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for (let i = 0; i < bufferSize; i++) data[i] = Math.random() * 2 - 1;
+    return buffer;
+  }
+
+  function scheduleWhisper() {
+    if (!playing) return;
+    const delay = 9000 + Math.random() * 14000;
+    whisperTimer = setTimeout(() => {
+      if (!playing) return;
+      try {
+        const src = ctx.createBufferSource();
+        src.buffer = makeNoiseBuffer(1.6);
+        const band = ctx.createBiquadFilter();
+        band.type = "bandpass";
+        band.frequency.value = 300 + Math.random() * 900;
+        band.Q.value = 6;
+        const g = ctx.createGain();
+        const now = ctx.currentTime;
+        g.gain.setValueAtTime(0, now);
+        g.gain.linearRampToValueAtTime(0.05, now + 0.5);
+        g.gain.linearRampToValueAtTime(0, now + 1.6);
+        src.connect(band).connect(g).connect(master);
+        src.start(now);
+        src.stop(now + 1.7);
+      } catch (e) { /* ignore */ }
+      scheduleWhisper();
+    }, delay);
+  }
+
+  function start() {
+    if (!supported()) return;
+    ensureContext();
+    if (ctx.state === "suspended") ctx.resume();
+    if (playing) return;
+    playing = true;
+
+    const now = ctx.currentTime;
+    master.gain.cancelScheduledValues(now);
+    master.gain.setValueAtTime(master.gain.value, now);
+    master.gain.linearRampToValueAtTime(0.22, now + 1.5);
+
+    // low detuned drone pair
+    const freqs = [55, 58.3];
+    const filter = ctx.createBiquadFilter();
+    filter.type = "lowpass";
+    filter.frequency.value = 400;
+    filter.connect(master);
+    nodes.push(filter);
+
+    freqs.forEach((f, i) => {
+      const osc = ctx.createOscillator();
+      osc.type = i === 0 ? "sine" : "triangle";
+      osc.frequency.value = f;
+      const g = ctx.createGain();
+      g.gain.value = 0.5;
+      osc.connect(g).connect(filter);
+      osc.start();
+      nodes.push(osc, g);
+    });
+
+    // slow tremolo swell via LFO modulating the filter gain
+    const lfo = ctx.createOscillator();
+    lfo.frequency.value = 0.06; // ~16s cycle
+    const lfoGain = ctx.createGain();
+    lfoGain.gain.value = 120;
+    lfo.connect(lfoGain).connect(filter.frequency);
+    lfo.start();
+    nodes.push(lfo, lfoGain);
+
+    // sparse high texture note, very quiet, detuned octave for unease
+    const texOsc = ctx.createOscillator();
+    texOsc.type = "sine";
+    texOsc.frequency.value = 117;
+    const texGain = ctx.createGain();
+    texGain.gain.value = 0.03;
+    texOsc.connect(texGain).connect(master);
+    texOsc.start();
+    nodes.push(texOsc, texGain);
+
+    scheduleWhisper();
+  }
+
+  function stop() {
+    playing = false;
+    if (whisperTimer) clearTimeout(whisperTimer);
+    if (master && ctx) {
+      const now = ctx.currentTime;
+      master.gain.cancelScheduledValues(now);
+      master.gain.setValueAtTime(master.gain.value, now);
+      master.gain.linearRampToValueAtTime(0, now + 0.8);
+    }
+    setTimeout(() => {
+      nodes.forEach(n => { try { n.stop && n.stop(); n.disconnect && n.disconnect(); } catch (e) {} });
+      nodes = [];
+    }, 900);
+  }
+
+  function toggle() {
+    if (!supported()) return false;
+    if (playing) { stop(); return false; }
+    start(); return true;
+  }
+
+  function isPlaying() { return playing; }
+
+  return { toggle, isPlaying, supported, start, stop };
+})();
+
+</script>
+<script>
+// ===================== ENGINE =====================
+// Depends on: SEVERITY, DIFFICULTY, newState, clamp/add* helpers,
+// ENDINGS, resolveEnding, buildScript, N, L  (game-data.js)
+// PORTRAITS, SCENES, getScene, getPortrait, CHAR_COLORS  (assets.js)
+// MusicEngine                                             (music.js)
+
+const App = (() => {
+  let state = null;
+  let script = null;
+  let stepIndex = -1;      // -1 = title screen
+  let shiftAssigned = [];  // indices of patients currently assigned a doctor, during a shift step
+  let shiftResults = null; // computed outcomes once "Begin shift" is pressed
+  let choiceFollowUp = null; // { scene, lines } shown after a choice is made, before advancing
+
+  const root = () => document.getElementById("app");
+
+  function start() {
+    mountSoundToggle();
+    render();
+  }
+
+  function mountSoundToggle() {
+    const btn = document.createElement("button");
+    btn.className = "sound-toggle";
+    btn.setAttribute("aria-label", "Toggle background sound");
+    btn.textContent = "sound: off";
+    btn.onclick = () => {
+      const nowOn = MusicEngine.toggle();
+      btn.textContent = nowOn ? "sound: on" : "sound: off";
+      btn.classList.toggle("is-on", nowOn);
+    };
+    document.body.appendChild(btn);
+    if (!MusicEngine.supported()) {
+      btn.disabled = true;
+      btn.textContent = "sound unavailable";
+    }
+  }
+
+  function chooseDifficulty(key) {
+    state = newState(key);
+    script = buildScript();
+    stepIndex = 0;
+    render();
+  }
+
+  function advance() {
+    stepIndex++;
+    shiftAssigned = [];
+    shiftResults = null;
+    choiceFollowUp = null;
+    if (stepIndex >= script.length) { render(); return; }
+    render();
+  }
+
+  function currentStep() {
+    return script[stepIndex];
+  }
+
+  function toggleAssign(i, capacity) {
+    const idx = shiftAssigned.indexOf(i);
+    if (idx >= 0) {
+      shiftAssigned.splice(idx, 1);
+    } else if (shiftAssigned.length < capacity) {
+      shiftAssigned.push(i);
+    }
+    render();
+  }
+
+  function beginShift() {
+    const step = currentStep();
+    const results = [];
+    step.patients.forEach((p, i) => {
+      const sev = SEVERITY[p.severity];
+      if (shiftAssigned.includes(i)) {
+        results.push({ ...p, outcome: "treated" });
+        state.patientsSaved++; state.patientsTotal++;
+      } else {
+        const lives = Math.random() < sev.survive;
+        if (lives) {
+          results.push({ ...p, outcome: "stabilized" });
+          state.patientsSaved++; state.patientsTotal++;
+        } else {
+          results.push({ ...p, outcome: "lost" });
+          state.patientsLost++; state.patientsTotal++;
+          addRep(state, -6);
+        }
+      }
+    });
+    const income = shiftAssigned.length * 300;
+    addMoney(state, income);
+    if (shiftAssigned.length === step.patients.length) addRep(state, 2);
+    shiftResults = { results, income };
+    render();
+  }
+
+  function makeChoice(step, opt) {
+    opt.effect(state);
+    if (step.after) step.after(state);
+    choiceFollowUp = { scene: opt.scene || null, lines: opt.lines || [] };
+    render();
+  }
+
+  function makeFinalChoice(idx1based) {
+    state.finalChoice = idx1based;
+    advance();
+  }
+
+  // ---------------- rendering ----------------
+
+  function render() {
+    const el = root();
+    el.innerHTML = "";
+
+    if (stepIndex === -1) {
+      el.appendChild(renderTitle());
+      return;
+    }
+
+    if (stepIndex >= script.length) {
+      const ending = resolveEnding(state, state.finalChoice);
+      el.appendChild(renderEnding(ending));
+      return;
+    }
+
+    const step = currentStep();
+    el.appendChild(renderChrome(step));
+
+    const body = document.createElement("div");
+    body.className = "panel";
+
+    switch (step.type) {
+      case "text": body.appendChild(renderText(step)); break;
+      case "day": body.appendChild(renderDay(step)); stepIndex++; break; // auto-advance through header
+      case "shift": body.appendChild(renderShift(step)); break;
+      case "choice": body.appendChild(renderChoice(step)); break;
+      case "finalChoice": body.appendChild(renderFinalChoice(step)); break;
+      case "dayEnd": body.appendChild(renderDayEnd()); break;
+    }
+
+    el.appendChild(body);
+
+    if (step.type === "day") { render(); } // re-render immediately with the real next step
+  }
+
+  function renderTitle() {
+    const wrap = document.createElement("div");
+    wrap.className = "title-screen";
+    wrap.innerHTML = `
+      <div class="ecg">${ecgSvg()}</div>
+      <h1>The Last Shift</h1>
+      <p class="tagline">Seven days. One emergency department. A truth someone buried on purpose.</p>
+      <div class="difficulty-list"></div>
+    `;
+    const list = wrap.querySelector(".difficulty-list");
+    Object.entries(DIFFICULTY).forEach(([key, d]) => {
+      const btn = document.createElement("button");
+      btn.className = "diff-card";
+      btn.innerHTML = `<span class="diff-name">${d.label}</span><span class="diff-sub">${d.sub}</span>`;
+      btn.onclick = () => chooseDifficulty(key);
+      list.appendChild(btn);
+    });
+    return wrap;
+  }
+
+  function renderChrome(step) {
+    const chrome = document.createElement("div");
+    chrome.className = "chrome";
+    const dayLabel = state.day <= 7 ? `Day ${state.day} / 7` : "";
+    chrome.innerHTML = `
+      <div class="chrome-top">
+        <span class="brand">St. Mary's — case file</span>
+        <span class="day-label">${dayLabel}</span>
+      </div>
+      <div class="vitals"></div>
+    `;
+    const vitals = chrome.querySelector(".vitals");
+    const items = [
+      ["reputation", state.reputation],
+      ["investigation", state.investigation],
+      ["cash", "$" + state.money.toLocaleString()],
+      ["maya trust", state.mayaTrust],
+      ["carter trust", state.carterTrust],
+    ];
+    items.forEach(([label, value]) => {
+      const d = document.createElement("div");
+      d.className = "vital";
+      d.innerHTML = `<span class="vital-value">${value}</span><span class="vital-label">${label}</span>`;
+      vitals.appendChild(d);
+    });
+    return chrome;
+  }
+
+  function renderDay(step) {
+    const d = document.createElement("div");
+    d.className = "day-banner";
+    d.innerHTML = `<div class="day-ecg">${ecgSvg()}</div><div class="day-title">Day ${step.day} — ${step.title}</div>`;
+    return d;
+  }
+
+  function renderSceneImage(sceneKey) {
+    const div = document.createElement("div");
+    div.className = "scene-image";
+    div.innerHTML = getScene(sceneKey);
+    return div;
+  }
+
+  function renderDialogueLines(container, lines) {
+    lines.forEach(line => {
+      if (line.speaker === "narration") {
+        const p = document.createElement("p");
+        p.className = "case-text";
+        p.textContent = line.text;
+        container.appendChild(p);
+      } else {
+        const portrait = getPortrait(line.speaker);
+        const row = document.createElement("div");
+        row.className = "dialogue-row";
+        row.innerHTML = `
+          <div class="portrait" style="--char-color:${CHAR_COLORS[line.speaker] || "#8b98a5"}">${portrait || ""}</div>
+          <div class="dialogue-bubble">
+            <span class="dialogue-name">${speakerName(line.speaker)}</span>
+            <p class="dialogue-text">${line.text}</p>
+          </div>
+        `;
+        container.appendChild(row);
+      }
+    });
+  }
+
+  function speakerName(key) {
+    const names = { ALEX: "Alex Morgan", MAYA: "Maya", CARTER: "Dr. Carter", BLACKWOOD: "Blackwood", VALE: "Dr. Vale" };
+    return names[key] || key;
+  }
+
+  function renderText(step) {
+    const wrap = document.createElement("div");
+    wrap.className = "case-file";
+    if (step.scene) wrap.appendChild(renderSceneImage(step.scene));
+    renderDialogueLines(wrap, step.lines || []);
+
+    const btn = document.createElement("button");
+    btn.className = "btn-continue";
+    btn.textContent = "Continue";
+    btn.onclick = () => { if (step.after) step.after(state); advance(); };
+    wrap.appendChild(btn);
+    return wrap;
+  }
+
+  function renderShift(step) {
+    const wrap = document.createElement("div");
+    wrap.className = "shift";
+    const capacity = Math.min(state.doctors, state.beds);
+
+    if (!shiftResults) {
+      wrap.innerHTML = `
+        <div class="shift-head">
+          <span>Hospital shift — doctors: ${state.doctors} · beds: ${state.beds}</span>
+          <span class="assign-count">${shiftAssigned.length} / ${capacity} assigned</span>
+        </div>
+        <div class="patient-list"></div>
+        <button class="btn-continue">Begin shift</button>
+      `;
+      const list = wrap.querySelector(".patient-list");
+      step.patients.forEach((p, i) => {
+        const sev = SEVERITY[p.severity];
+        const row = document.createElement("button");
+        const assigned = shiftAssigned.includes(i);
+        row.className = `patient-row tone-${sev.tone}` + (assigned ? " assigned" : "");
+        row.disabled = !assigned && shiftAssigned.length >= capacity;
+        row.innerHTML = `
+          <span class="patient-name">${p.name}</span>
+          <span class="patient-condition">${p.condition}</span>
+          <span class="patient-severity">${sev.label}</span>
+          <span class="patient-action">${assigned ? "Assigned" : "Assign doctor"}</span>
+        `;
+        row.onclick = () => toggleAssign(i, capacity);
+        list.appendChild(row);
+      });
+      wrap.querySelector(".btn-continue").onclick = beginShift;
+    } else {
+      wrap.innerHTML = `<div class="shift-head"><span>Shift results</span><span class="assign-count">Income +$${shiftResults.income}</span></div>`;
+      const list = document.createElement("div");
+      list.className = "result-list";
+      shiftResults.results.forEach(r => {
+        const row = document.createElement("div");
+        const toneClass = r.outcome === "lost" ? "tone-crit" : r.outcome === "stabilized" ? "tone-warn" : "tone-ok";
+        row.className = `result-row ${toneClass}`;
+        const msg = r.outcome === "treated" ? "Treated and stable"
+                  : r.outcome === "stabilized" ? "Not treated in time, but stabilized"
+                  : "Did not survive the wait";
+        row.innerHTML = `<span class="patient-name">${r.name}</span><span>${msg}</span>`;
+        list.appendChild(row);
+      });
+      wrap.appendChild(list);
+      const btn = document.createElement("button");
+      btn.className = "btn-continue";
+      btn.textContent = "Continue";
+      btn.onclick = advance;
+      wrap.appendChild(btn);
+    }
+    return wrap;
+  }
+
+  function renderChoice(step) {
+    const wrap = document.createElement("div");
+    wrap.className = "choice-block";
+
+    if (!choiceFollowUp) {
+      const prompt = document.createElement("p");
+      prompt.className = "choice-prompt";
+      prompt.textContent = step.prompt;
+      wrap.appendChild(prompt);
+      const list = document.createElement("div");
+      list.className = "choice-list";
+      step.options.forEach((opt, i) => {
+        const btn = document.createElement("button");
+        btn.className = "choice-row";
+        btn.innerHTML = `<span class="choice-index">${i + 1}</span><span>${opt.label}</span>`;
+        btn.onclick = () => makeChoice(step, opt);
+        list.appendChild(btn);
+      });
+      wrap.appendChild(list);
+    } else {
+      if (choiceFollowUp.scene) wrap.appendChild(renderSceneImage(choiceFollowUp.scene));
+      renderDialogueLines(wrap, choiceFollowUp.lines);
+      const btn = document.createElement("button");
+      btn.className = "btn-continue";
+      btn.textContent = "Continue";
+      btn.onclick = advance;
+      wrap.appendChild(btn);
+    }
+    return wrap;
+  }
+
+  function renderFinalChoice(step) {
+    const wrap = document.createElement("div");
+    wrap.className = "choice-block";
+    const prompt = document.createElement("p");
+    prompt.className = "choice-prompt";
+    prompt.textContent = step.prompt;
+    wrap.appendChild(prompt);
+    const list = document.createElement("div");
+    list.className = "choice-list";
+    step.options.forEach((label, i) => {
+      const btn = document.createElement("button");
+      btn.className = "choice-row";
+      btn.innerHTML = `<span class="choice-index">${i + 1}</span><span>${label}</span>`;
+      btn.onclick = () => makeFinalChoice(i + 1);
+      list.appendChild(btn);
+    });
+    wrap.appendChild(list);
+    return wrap;
+  }
+
+  function renderDayEnd() {
+    const wrap = document.createElement("div");
+    wrap.className = "day-end";
+    wrap.innerHTML = `
+      <p class="day-end-title">End of day ${state.day}</p>
+      <p class="day-end-sub">Patients saved so far: ${state.patientsSaved} / ${state.patientsTotal}</p>
+      <button class="btn-continue">Start next day</button>
+    `;
+    wrap.querySelector("button").onclick = () => { state.day++; advance(); };
+    return wrap;
+  }
+
+  function renderEnding(ending) {
+    const wrap = document.createElement("div");
+    wrap.className = "ending-screen";
+    const ecgDiv = document.createElement("div");
+    ecgDiv.className = "ecg";
+    ecgDiv.innerHTML = ecgSvg();
+    wrap.appendChild(ecgDiv);
+
+    const eyebrow = document.createElement("p");
+    eyebrow.className = "ending-eyebrow";
+    eyebrow.textContent = "Ending";
+    wrap.appendChild(eyebrow);
+
+    const h1 = document.createElement("h1");
+    h1.textContent = ending.title;
+    wrap.appendChild(h1);
+
+    if (ending.scene) wrap.appendChild(renderSceneImage(ending.scene));
+
+    const textWrap = document.createElement("div");
+    textWrap.className = "ending-text-wrap";
+    renderDialogueLines(textWrap, ending.lines);
+    wrap.appendChild(textWrap);
+
+    const stats = document.createElement("div");
+    stats.className = "final-stats";
+    const items = [
+      ["Reputation", state.reputation],
+      ["Investigation", state.investigation],
+      ["Money", "$" + state.money.toLocaleString()],
+      ["Maya trust", state.mayaTrust],
+      ["Carter trust", state.carterTrust],
+      ["Blackwood", state.blackwood],
+      ["Patients saved", `${state.patientsSaved} / ${state.patientsTotal}`],
+    ];
+    items.forEach(([label, value]) => {
+      const d = document.createElement("div");
+      d.className = "final-stat";
+      d.innerHTML = `<span>${label}</span><strong>${value}</strong>`;
+      stats.appendChild(d);
+    });
+    wrap.appendChild(stats);
+
+    const btn = document.createElement("button");
+    btn.className = "btn-continue";
+    btn.textContent = "Play again";
+    btn.onclick = () => location.reload();
+    wrap.appendChild(btn);
+
+    return wrap;
+  }
+
+  function ecgSvg() {
+    return `<svg viewBox="0 0 300 40" preserveAspectRatio="none" class="ecg-svg">
+      <polyline points="0,20 40,20 55,20 65,6 75,34 85,20 100,20 130,20 145,20 155,10 165,30 175,20 190,20 300,20"/>
+    </svg>`;
+  }
+
+  return { start };
+})();
+
+if (typeof document !== "undefined") {
+  window.addEventListener("DOMContentLoaded", App.start);
+}
+
+</script>
+</body>
+</html>
