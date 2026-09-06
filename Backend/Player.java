@@ -1,8 +1,6 @@
 package laststory;
 
-/**
- * Dr. Alex Morgan. Holds the core stats the whole game is built on.
- */
+
 public class Player {
 
     private final String name;
