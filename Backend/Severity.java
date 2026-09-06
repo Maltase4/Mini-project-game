@@ -1,8 +1,6 @@
 package laststory;
 
-/**
- * How urgently a patient needs treatment.
- */
+
 public enum Severity {
     MINOR(1),
     MODERATE(2),
