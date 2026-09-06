@@ -1,9 +1,6 @@
 package laststory;
 
-/**
- * A patient arriving at St. Mary's. Plain data + behaviour object,
- * used by Hospital during each day's triage mini-game.
- */
+
 public class Patient {
 
     private final String name;
