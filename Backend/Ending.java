@@ -1,10 +1,5 @@
 package laststory;
 
-/**
- * The five possible endings. resolve() is the single place that reads
- * the accumulated Player/StoryState stats plus the final choice and
- * decides which one the player earned.
- */
 public enum Ending {
 
     HERO("THE HERO", """
@@ -76,11 +71,7 @@ public enum Ending {
         return text;
     }
 
-    /**
-     * Decide the ending from everything that happened across all 7 days.
-     * finalChoice: 1 = release publicly, 2 = give to authorities,
-     *              3 = destroy evidence, 4 = give to Blackwood
-     */
+   
     public static Ending resolve(Player player, StoryState story, int finalChoice) {
         boolean collapsed = player.getReputation() < 20
                 || player.getMoney() <= 0
@@ -98,7 +89,7 @@ public enum Ending {
             return SILENCE;
         }
 
-        // finalChoice 1 or 2 : exposing the truth
+    
         boolean heroRequirements =
                 player.getInvestigation() >= 80
                         && story.isEvidenceCollected()
